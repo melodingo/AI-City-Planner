@@ -3,83 +3,85 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>City Traffic Sim</title>
+<title>CityFlow</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap');
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   :root {
-    --bg:        #1a1c22;
-    --surface:   #22252e;
-    --border:    #2e3240;
-    --accent:    #e8c547;
-    --accent2:   #5b8dee;
-    --text:      #c8cdd8;
-    --muted:     #555c70;
-    --road-bg:   #2a2d38;
-    --road-lane: #3a3e4e;
-    --asphalt:   #1e2028;
-    --marking:   #4a4e60;
-    --grass:     #1e2830;
-    --building:  #2c303d;
-    --building2: #252832;
-    --highway:   #1a3a5c;
-    --inter:     #2a2d38;
+    --bg: #171a22;
+    --surface: #1f2430;
+    --border: #31394b;
+    --text: #c8d0df;
+    --muted: #73809b;
+    --accent: #f4c24f;
+    --local: #3f485d;
+    --main: #2f638f;
+    --highway: #216e7f;
+    --inter: #2f3344;
+    --block: #1d202b;
+    --block-alt: #1a1d27;
   }
 
   body {
-    background: var(--bg);
+    height: 100vh;
+    overflow: hidden;
+    background: radial-gradient(1200px 600px at 40% -20%, #273147 0%, #171a22 60%);
     color: var(--text);
     font-family: 'Space Mono', monospace;
-    overflow: hidden;
-    height: 100vh;
     display: flex;
     flex-direction: column;
   }
 
   #header {
+    z-index: 10;
     display: flex;
     align-items: center;
-    gap: 24px;
-    padding: 10px 20px;
+    gap: 18px;
+    padding: 10px 16px;
     border-bottom: 1px solid var(--border);
-    background: var(--surface);
+    background: rgba(31, 36, 48, 0.95);
+    backdrop-filter: blur(4px);
     flex-shrink: 0;
-    z-index: 10;
   }
 
   #header h1 {
     font-family: 'Syne', sans-serif;
     font-weight: 800;
     font-size: 15px;
-    letter-spacing: 0.15em;
     text-transform: uppercase;
+    letter-spacing: 0.14em;
     color: var(--accent);
+    white-space: nowrap;
   }
 
-  .stat-group {
+  .stats {
     display: flex;
-    gap: 20px;
-    flex: 1;
+    gap: 16px;
+    flex-wrap: wrap;
+    align-items: center;
     justify-content: center;
+    flex: 1;
   }
 
   .stat {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1px;
+    min-width: 72px;
+    text-align: center;
   }
 
-  .stat-val {
+  .stat .v {
+    display: block;
+    font-family: 'Syne', sans-serif;
     font-size: 16px;
     font-weight: 700;
     color: #fff;
-    font-family: 'Syne', sans-serif;
+    line-height: 1.1;
   }
 
-  .stat-label {
+  .stat .l {
+    display: block;
+    margin-top: 1px;
     font-size: 9px;
     color: var(--muted);
     letter-spacing: 0.1em;
@@ -88,270 +90,492 @@
 
   .controls {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
 
   button {
-    background: transparent;
     border: 1px solid var(--border);
+    background: transparent;
     color: var(--text);
     font-family: 'Space Mono', monospace;
     font-size: 11px;
-    padding: 5px 12px;
+    padding: 5px 10px;
     cursor: pointer;
-    transition: all 0.15s;
-    letter-spacing: 0.05em;
+    transition: all 0.15s ease;
   }
 
   button:hover { border-color: var(--accent); color: var(--accent); }
-  button.active { border-color: var(--accent); color: var(--accent); background: rgba(232,197,71,0.08); }
-
-  #speed-label { font-size: 11px; color: var(--muted); }
+  button.active { border-color: var(--accent); color: var(--accent); background: rgba(244,194,79,0.1); }
 
   #canvas-wrap {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
     position: relative;
+    flex: 1;
+    overflow: hidden;
   }
 
-  canvas { display: block; image-rendering: pixelated; }
+  canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: grab;
+  }
+
+  canvas.dragging { cursor: grabbing; }
 
   #legend {
     position: absolute;
-    bottom: 14px;
-    right: 14px;
-    background: rgba(34,37,46,0.92);
+    right: 12px;
+    bottom: 12px;
+    padding: 10px 12px;
     border: 1px solid var(--border);
-    padding: 10px 14px;
+    background: rgba(29, 33, 44, 0.9);
     font-size: 10px;
-    line-height: 1.8;
+    line-height: 1.75;
   }
 
-  .leg-row { display: flex; align-items: center; gap: 8px; color: var(--muted); }
-  .leg-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .leg { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+  .swatch { width: 14px; height: 8px; border-radius: 8px; }
+
+  #zoom-tip {
+    position: absolute;
+    left: 12px;
+    bottom: 12px;
+    font-size: 10px;
+    color: var(--muted);
+    background: rgba(29, 33, 44, 0.9);
+    border: 1px solid var(--border);
+    padding: 8px 10px;
+  }
+
+  @media (max-width: 900px) {
+    #header { gap: 10px; padding: 8px 10px; }
+    #header h1 { font-size: 12px; }
+    .stats { gap: 10px; }
+    .stat { min-width: 58px; }
+    .stat .v { font-size: 13px; }
+    .controls { justify-content: center; }
+  }
 </style>
 </head>
 <body>
 
 <div id="header">
-  <h1>&#9632; CityFlow</h1>
-  <div class="stat-group">
-    <div class="stat"><span class="stat-val" id="s-tick">0</span><span class="stat-label">Tick</span></div>
-    <div class="stat"><span class="stat-val" id="s-cars">0</span><span class="stat-label">Active</span></div>
-    <div class="stat"><span class="stat-val" id="s-done">0</span><span class="stat-label">Arrived</span></div>
-    <div class="stat"><span class="stat-val" id="s-stop">0</span><span class="stat-label">Stopped</span></div>
-    <div class="stat"><span class="stat-val" id="s-avg">0.0</span><span class="stat-label">Avg Travel</span></div>
+  <h1>CityFlow</h1>
+  <div class="stats">
+    <div class="stat"><span class="v" id="s-tick">0</span><span class="l">Tick</span></div>
+    <div class="stat"><span class="v" id="s-cars">0</span><span class="l">Active</span></div>
+    <div class="stat"><span class="v" id="s-done">0</span><span class="l">Arrived</span></div>
+    <div class="stat"><span class="v" id="s-stop">0</span><span class="l">Stopped</span></div>
+    <div class="stat"><span class="v" id="s-avg">0.0</span><span class="l">Avg Travel</span></div>
+    <div class="stat"><span class="v" id="s-zoom">100%</span><span class="l">Zoom</span></div>
   </div>
   <div class="controls">
-    <span id="speed-label">Speed</span>
-    <button id="btn-slow">0.5×</button>
-    <button id="btn-norm" class="active">1×</button>
-    <button id="btn-fast">3×</button>
-    <button id="btn-pause">⏸ Pause</button>
+    <button id="btn-slow">0.5x</button>
+    <button id="btn-norm" class="active">1x</button>
+    <button id="btn-fast">3x</button>
+    <button id="btn-zout">-</button>
+    <button id="btn-zreset">Reset View</button>
+    <button id="btn-zin">+</button>
+    <button id="btn-pause">Pause</button>
   </div>
 </div>
 
 <div id="canvas-wrap">
   <canvas id="c"></canvas>
   <div id="legend">
-    <div class="leg-row"><div class="leg-dot" style="background:#3a4a5a;border-radius:2px;width:14px;height:8px"></div>Road</div>
-    <div class="leg-row"><div class="leg-dot" style="background:#1e4a7a;border-radius:2px;width:14px;height:8px"></div>Highway</div>
-    <div class="leg-row"><div class="leg-dot" style="background:#2a3848;border-radius:2px;width:12px;height:12px"></div>Intersection</div>
-    <div class="leg-row"><div class="leg-dot" style="background:#e8c547"></div>Car (moving)</div>
-    <div class="leg-row"><div class="leg-dot" style="background:#e05050"></div>Car (stopped)</div>
+    <div class="leg"><span class="swatch" style="background:#3f485d"></span>Local road</div>
+    <div class="leg"><span class="swatch" style="background:#2f638f"></span>Main street</div>
+    <div class="leg"><span class="swatch" style="background:#216e7f"></span>Highway (4 lanes)</div>
+    <div class="leg"><span class="swatch" style="background:#2f3344"></span>Intersection</div>
   </div>
+  <div id="zoom-tip">Wheel: zoom | Drag: pan</div>
 </div>
 
 <script>
-// ==========================================================
-//  CONSTANTS & CONFIG
-// ==========================================================
-const EMPTY = 0, ROAD = 1, HIGHWAY = 2, INTER = 3;
-const GRID_W = 24, GRID_H = 24;
-const CELL = 36; // pixels per cell
+const EMPTY = 0;
+const LOCAL = 1;
+const MAIN = 2;
+const HIGHWAY = 3;
+const INTER = 4;
 
-// Visual lane offset: cars drive on RIGHT side
-// For a horizontal road eastbound = lower half, westbound = upper half
-// For a vertical road  southbound = right half, northbound = left half
-const LANE_OFFSET = 7; // px from cell centre
+const GRID_W = 64;
+const GRID_H = 46;
+const CELL = 24;
 
-// Colours
+const ROAD_RANK = { [LOCAL]: 1, [MAIN]: 2, [HIGHWAY]: 3 };
+const CLASS_BIT = { [LOCAL]: 1, [MAIN]: 2, [HIGHWAY]: 4 };
+const ROAD_COLOR = { [LOCAL]: '#3f485d', [MAIN]: '#2f638f', [HIGHWAY]: '#216e7f' };
+
 const C = {
-  bg:        '#12141a',
-  block:     '#1e2028',
-  block2:    '#1c1e26',
-  road_h:    '#252830',  // horizontal road surface
-  road_v:    '#252830',  // vertical road surface
-  highway:   '#18273a',
-  inter:     '#20232c',
-  marking:   '#383c4e',
-  dash:      '#3a3e52',
-  kerb:      '#2e3240',
-  carMove:   '#e8c547',
-  carStop:   '#e05555',
-  carShadow: 'rgba(0,0,0,0.5)',
-  headlight: 'rgba(255,240,180,0.6)',
-  tree:      '#1a3020',
+  bg: '#131722',
+  block: '#1d2231',
+  blockAlt: '#192031',
+  lot: '#243048',
+  lotAlt: '#283552',
+  roofA: '#5f6d8a',
+  roofB: '#6c7c9b',
+  inter: '#2f3344',
+  lane: 'rgba(214,222,240,0.18)',
+  carStop: '#e76464',
+  carShadow: 'rgba(0,0,0,0.45)',
+  headlight: 'rgba(255,245,170,0.55)',
 };
 
-// ==========================================================
-//  GRID SETUP
-// ==========================================================
-let grid = new Array(GRID_H).fill(null).map(() => new Array(GRID_W).fill(EMPTY));
-// direction per cell: 'h'=horizontal, 'v'=vertical, 'b'=both (intersection)
-let cellDir = new Array(GRID_H).fill(null).map(() => new Array(GRID_W).fill(null));
+let grid = [];
+let dirGrid = [];
+let interMask = [];
+let buildingCache = [];
 
-function buildCity() {
-  // Clear
-  for (let y = 0; y < GRID_H; y++)
-    for (let x = 0; x < GRID_W; x++) { grid[y][x] = EMPTY; cellDir[y][x] = null; }
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
 
-  // Road grid: streets every 4 cells, but with organic variation
-  const hRoads = [2, 6, 10, 14, 18, 22];
-  const vRoads = [2, 6, 10, 14, 18, 22];
-  // Highways (wider, faster)
-  const hHighways = [6, 14];
-  const vHighways = [6, 14];
+const view = {
+  zoom: 1,
+  minZoom: 0.45,
+  maxZoom: 2.8,
+  panX: 0,
+  panY: 0,
+  dragging: false,
+  dragStartX: 0,
+  dragStartY: 0,
+};
 
-  // Lay horizontal roads
-  for (const row of hRoads) {
-    if (row >= GRID_H) continue;
-    const isHwy = hHighways.includes(row);
-    for (let x = 0; x < GRID_W; x++) {
-      grid[row][x] = isHwy ? HIGHWAY : ROAD;
-      cellDir[row][x] = 'h';
-    }
-  }
+const WORLD_W = GRID_W * CELL;
+const WORLD_H = GRID_H * CELL;
 
-  // Lay vertical roads
-  for (const col of vRoads) {
-    if (col >= GRID_W) continue;
-    const isHwy = vHighways.includes(col);
-    for (let y = 0; y < GRID_H; y++) {
-      if (grid[y][col] === HIGHWAY || grid[y][col] === ROAD) {
-        // intersection
-        grid[y][col] = INTER;
-        cellDir[y][col] = 'b';
-      } else {
-        grid[y][col] = isHwy ? HIGHWAY : ROAD;
-        cellDir[y][col] = 'v';
-      }
-    }
-  }
+function create2D(h, w, fillVal) {
+  return new Array(h).fill(null).map(() => new Array(w).fill(fillVal));
+}
 
-  // Fix horizontal cells that got overwritten – re-mark intersections
-  for (const row of hRoads) {
-    for (const col of vRoads) {
-      if (row < GRID_H && col < GRID_W) {
-        grid[row][col] = INTER;
-        cellDir[row][col] = 'b';
-      }
-    }
-  }
+function resetArrays() {
+  grid = create2D(GRID_H, GRID_W, EMPTY);
+  dirGrid = create2D(GRID_H, GRID_W, null);
+  interMask = create2D(GRID_H, GRID_W, 0);
+}
+
+function inBounds(x, y) {
+  return x >= 0 && y >= 0 && x < GRID_W && y < GRID_H;
 }
 
 function isDrivable(x, y) {
-  if (x < 0 || y < 0 || x >= GRID_W || y >= GRID_H) return false;
-  return grid[y][x] !== EMPTY;
+  return inBounds(x, y) && grid[y][x] !== EMPTY;
 }
 
-// Valid moves respecting direction (right-hand traffic)
-// dir: {dx,dy}  e.g. {dx:1,dy:0} = eastbound
-function neighbours(x, y) {
-  const dirs = [{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}];
-  const result = [];
-  for (const d of dirs) {
-    const nx = x + d.dx, ny = y + d.dy;
-    if (!isDrivable(nx, ny)) continue;
-    const srcDir = cellDir[y][x];
-    const dstDir = cellDir[ny][nx];
-    // Only allow turns at intersections or matching direction
-    if (srcDir === 'b' || dstDir === 'b') { result.push({x:nx,y:ny,dx:d.dx,dy:d.dy}); continue; }
-    if (srcDir === 'h' && d.dy === 0) result.push({x:nx,y:ny,dx:d.dx,dy:d.dy});
-    if (srcDir === 'v' && d.dx === 0) result.push({x:nx,y:ny,dx:d.dx,dy:d.dy});
+function setRoad(x, y, roadType, dir) {
+  if (!inBounds(x, y)) return;
+  const cur = grid[y][x];
+  const curDir = dirGrid[y][x];
+
+  if (cur === EMPTY) {
+    grid[y][x] = roadType;
+    dirGrid[y][x] = dir;
+    return;
   }
-  return result;
+
+  if (cur === INTER) {
+    interMask[y][x] |= CLASS_BIT[roadType] || 0;
+    return;
+  }
+
+  if (curDir === dir) {
+    grid[y][x] = ROAD_RANK[roadType] > ROAD_RANK[cur] ? roadType : cur;
+    return;
+  }
+
+  grid[y][x] = INTER;
+  dirGrid[y][x] = 'b';
+  interMask[y][x] = (CLASS_BIT[cur] || 0) | (CLASS_BIT[roadType] || 0);
 }
 
-// ==========================================================
-//  A* PATHFINDING
-// ==========================================================
-function heuristic(ax, ay, bx, by) { return Math.abs(ax-bx)+Math.abs(ay-by); }
+function buildCity() {
+  resetArrays();
 
-function astar(sx, sy, gx, gy) {
-  if (sx===gx && sy===gy) return [{x:sx,y:sy,dx:0,dy:0}];
-  const key = (x,y) => y*GRID_W+x;
-  const open = [{f:0,g:0,x:sx,y:sy,dx:0,dy:0}];
-  const gScore = {}; gScore[key(sx,sy)] = 0;
-  const from = {};
-  while (open.length) {
-    open.sort((a,b)=>a.f-b.f);
-    const cur = open.shift();
-    if (cur.x===gx && cur.y===gy) {
-      const path = [];
-      let c = cur;
-      while (c) { path.unshift(c); c = from[key(c.x,c.y)]; }
-      return path;
+  const clampI = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  function uniqueStarts(base, count, minGap, maxVal) {
+    const out = [];
+    let cur = base;
+    for (let i = 0; i < count; i++) {
+      cur += minGap + (Math.random() * minGap | 0);
+      if (cur >= maxVal - 2) break;
+      out.push(cur);
     }
-    for (const nb of neighbours(cur.x, cur.y)) {
-      const cost = grid[nb.y][nb.x] === HIGHWAY ? 1 : 2;
-      const ng = (gScore[key(cur.x,cur.y)]||0) + cost;
-      if (ng < (gScore[key(nb.x,nb.y)]??Infinity)) {
-        gScore[key(nb.x,nb.y)] = ng;
-        from[key(nb.x,nb.y)] = cur;
-        open.push({f:ng+heuristic(nb.x,nb.y,gx,gy), g:ng, ...nb});
+    return out;
+  }
+
+  function carveHorizontal(startY, roadType, turnChance = 0.14) {
+    let y = clampI(startY, 1, GRID_H - 2);
+    for (let x = 0; x < GRID_W; x++) {
+      setRoad(x, y, roadType, 'h');
+      if (x > 2 && x < GRID_W - 3 && Math.random() < turnChance) {
+        const nextY = clampI(y + (Math.random() < 0.5 ? -1 : 1), 1, GRID_H - 2);
+        if (nextY !== y) {
+          setRoad(x, nextY, roadType, 'v');
+          y = nextY;
+          setRoad(x, y, roadType, 'h');
+        }
       }
     }
   }
+
+  function carveVertical(startX, roadType, turnChance = 0.14) {
+    let x = clampI(startX, 1, GRID_W - 2);
+    for (let y = 0; y < GRID_H; y++) {
+      setRoad(x, y, roadType, 'v');
+      if (y > 2 && y < GRID_H - 3 && Math.random() < turnChance) {
+        const nextX = clampI(x + (Math.random() < 0.5 ? -1 : 1), 1, GRID_W - 2);
+        if (nextX !== x) {
+          setRoad(nextX, y, roadType, 'h');
+          x = nextX;
+          setRoad(x, y, roadType, 'v');
+        }
+      }
+    }
+  }
+
+  // Backbone network: a few long arterials with gentle bends.
+  const hHighway = [
+    clampI(Math.floor(GRID_H * 0.26), 2, GRID_H - 3),
+    clampI(Math.floor(GRID_H * 0.70), 2, GRID_H - 3),
+  ];
+  const vHighway = [
+    clampI(Math.floor(GRID_W * 0.30), 2, GRID_W - 3),
+    clampI(Math.floor(GRID_W * 0.74), 2, GRID_W - 3),
+  ];
+  for (const y of hHighway) carveHorizontal(y, HIGHWAY, 0.05);
+  for (const x of vHighway) carveVertical(x, HIGHWAY, 0.05);
+
+  const hMain = uniqueStarts(2, 5, 7, GRID_H).filter(y => !hHighway.includes(y));
+  const vMain = uniqueStarts(3, 6, 9, GRID_W).filter(x => !vHighway.includes(x));
+  for (const y of hMain) carveHorizontal(y, MAIN, 0.13);
+  for (const x of vMain) carveVertical(x, MAIN, 0.13);
+
+  // Local streets branch from existing roads as short, irregular collectors.
+  const seedTiles = [];
+  for (let y = 1; y < GRID_H - 1; y++) {
+    for (let x = 1; x < GRID_W - 1; x++) {
+      if (grid[y][x] === MAIN) seedTiles.push({x, y});
+    }
+  }
+
+  const localBranches = Math.floor((GRID_W * GRID_H) * 0.045);
+  for (let i = 0; i < localBranches; i++) {
+    const seed = seedTiles[Math.random() * seedTiles.length | 0];
+    if (!seed) continue;
+    let x = seed.x;
+    let y = seed.y;
+    let horizontal = Math.random() < 0.5;
+    const len = 2 + (Math.random() * 5 | 0);
+    for (let k = 0; k < len; k++) {
+      x += horizontal ? (Math.random() < 0.5 ? -1 : 1) : 0;
+      y += horizontal ? 0 : (Math.random() < 0.5 ? -1 : 1);
+      if (!inBounds(x, y)) break;
+      if (grid[y][x] === HIGHWAY) break;
+      if (grid[y][x] === MAIN && Math.random() < 0.55) break;
+      setRoad(x, y, LOCAL, horizontal ? 'h' : 'v');
+      if (Math.random() < 0.12) horizontal = !horizontal;
+    }
+  }
+
+  // Intersections default to local+main if the crossing source is unknown.
+  for (let y = 0; y < GRID_H; y++) {
+    for (let x = 0; x < GRID_W; x++) {
+      if (grid[y][x] === INTER && interMask[y][x] === 0) {
+        interMask[y][x] = CLASS_BIT[LOCAL] | CLASS_BIT[MAIN];
+      }
+    }
+  }
+}
+
+function tileClass(x, y) {
+  const t = grid[y][x];
+  if (t === LOCAL || t === MAIN || t === HIGHWAY) return t;
   return null;
 }
 
-// ==========================================================
-//  CAR CLASS
-// ==========================================================
+function canConnectClass(aClass, bClass) {
+  if (aClass == null || bClass == null) return false;
+  if (aClass === HIGHWAY && bClass === LOCAL) return false;
+  if (aClass === LOCAL && bClass === HIGHWAY) return false;
+  return true;
+}
+
+function dirCompatible(dir, dx, dy) {
+  if (dir === 'h') return dy === 0;
+  if (dir === 'v') return dx === 0;
+  return true;
+}
+
+function intersectionAccepts(ix, iy, roadClass) {
+  if (grid[iy][ix] !== INTER) return true;
+  return (interMask[iy][ix] & CLASS_BIT[roadClass]) !== 0;
+}
+
+function neighbours(x, y) {
+  const dirs = [{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}];
+  const out = [];
+  const srcType = grid[y][x];
+  const srcClass = srcType === INTER ? null : srcType;
+  const srcDir = dirGrid[y][x];
+
+  for (const d of dirs) {
+    const nx = x + d.dx;
+    const ny = y + d.dy;
+    if (!isDrivable(nx, ny)) continue;
+
+    const dstType = grid[ny][nx];
+    const dstClass = dstType === INTER ? null : dstType;
+    const dstDir = dirGrid[ny][nx];
+
+    if (!dirCompatible(srcDir, d.dx, d.dy)) continue;
+    if (!dirCompatible(dstDir, d.dx, d.dy)) continue;
+
+    if (srcType !== INTER && dstType !== INTER) {
+      if (!canConnectClass(srcClass, dstClass)) continue;
+    }
+
+    if (srcType === INTER && dstType !== INTER) {
+      if (!intersectionAccepts(x, y, dstClass)) continue;
+    }
+
+    if (srcType !== INTER && dstType === INTER) {
+      if (!intersectionAccepts(nx, ny, srcClass)) continue;
+    }
+
+    if (srcType === INTER && dstType === INTER) {
+      const mask = interMask[y][x] & interMask[ny][nx];
+      if (mask === 0) continue;
+    }
+
+    out.push({ x: nx, y: ny, dx: d.dx, dy: d.dy });
+  }
+  return out;
+}
+
+function moveCost(x, y) {
+  const t = grid[y][x];
+  if (t === HIGHWAY) return 1;
+  if (t === MAIN) return 2;
+  if (t === LOCAL) return 3;
+  return 2;
+}
+
+function heuristic(ax, ay, bx, by) {
+  return Math.abs(ax - bx) + Math.abs(ay - by);
+}
+
+function astar(sx, sy, gx, gy) {
+  if (sx === gx && sy === gy) return [{x: sx, y: sy, dx: 0, dy: 0}];
+
+  const key = (x, y) => y * GRID_W + x;
+  const open = [{x: sx, y: sy, g: 0, f: heuristic(sx, sy, gx, gy), dx: 0, dy: 0}];
+  const gScore = { [key(sx, sy)]: 0 };
+  const from = {};
+
+  while (open.length) {
+    open.sort((a, b) => a.f - b.f);
+    const cur = open.shift();
+    if (cur.x === gx && cur.y === gy) {
+      const path = [];
+      let node = cur;
+      while (node) {
+        path.unshift(node);
+        node = from[key(node.x, node.y)] || null;
+      }
+      return path;
+    }
+
+    for (const nb of neighbours(cur.x, cur.y)) {
+      const ng = (gScore[key(cur.x, cur.y)] ?? Infinity) + moveCost(nb.x, nb.y);
+      const nbKey = key(nb.x, nb.y);
+      if (ng < (gScore[nbKey] ?? Infinity)) {
+        gScore[nbKey] = ng;
+        from[nbKey] = cur;
+        open.push({ x: nb.x, y: nb.y, g: ng, f: ng + heuristic(nb.x, nb.y, gx, gy), dx: nb.dx, dy: nb.dy });
+      }
+    }
+  }
+
+  return null;
+}
+
 let carIdCounter = 0;
+
+function laneOffsetForClass(roadClass) {
+  if (roadClass === HIGHWAY) return [4, 9];
+  if (roadClass === MAIN) return [5];
+  return [4];
+}
+
+function lanePoint(gx, gy, dx, dy, laneIndex) {
+  const cx = gx * CELL + CELL / 2;
+  const cy = gy * CELL + CELL / 2;
+  const t = grid[gy][gx];
+  if (t === INTER || (dx === 0 && dy === 0)) return { x: cx, y: cy };
+
+  const roadClass = t;
+  const choices = laneOffsetForClass(roadClass);
+  const lane = choices[Math.min(laneIndex, choices.length - 1)];
+
+  if (dx !== 0) {
+    return { x: cx, y: cy + (dx > 0 ? lane : -lane) };
+  }
+  return { x: cx + (dy > 0 ? lane : -lane), y: cy };
+}
 
 class Car {
   constructor(x, y, gx, gy, path) {
     this.id = carIdCounter++;
-    this.x = x; this.y = y;          // grid position
-    this.gx = gx; this.gy = gy;      // destination
-    this.path = path.slice(1);       // steps remaining
-    this.dx = 0; this.dy = 0;        // current heading
-    if (path.length > 1) { this.dx = path[1].dx; this.dy = path[1].dy; }
-    this.stopped = false;
+    this.x = x;
+    this.y = y;
+    this.gx = gx;
+    this.gy = gy;
+    this.path = path.slice(1);
+    this.dx = 0;
+    this.dy = 0;
+    if (path.length > 1) {
+      this.dx = path[1].dx;
+      this.dy = path[1].dy;
+    }
+    const klass = tileClass(x, y) || MAIN;
+    this.laneIndex = klass === HIGHWAY ? (Math.random() < 0.5 ? 0 : 1) : 0;
+    const p = lanePoint(x, y, this.dx, this.dy, this.laneIndex);
+    this.rx = p.x;
+    this.ry = p.y;
+    this.targetRx = p.x;
+    this.targetRy = p.y;
     this.travelTime = 0;
-    this.waitAtInter = 0;
-    // Smooth rendering
-    this.rx = x * CELL + CELL/2;     // render x (px)
-    this.ry = y * CELL + CELL/2;     // render y (px)
-    this.targetRx = this.rx;
-    this.targetRy = this.ry;
-    this.lerpT = 1;
-    // Slight size variation for visual variety
-    this.len = 9 + Math.random()*3 | 0;
+    this.stopped = false;
+    this.len = 9 + (Math.random() * 4 | 0);
     this.wid = 5;
-    this.hue = Math.random() < 0.15 ? '#7ab8f0' : (Math.random()<0.1?'#80e080':'#e8c547');
+    this.color = Math.random() < 0.2 ? '#7cb6f5' : (Math.random() < 0.2 ? '#95de7f' : '#f4c24f');
   }
 
-  get arrived() { return this.x===this.gx && this.y===this.gy; }
+  get arrived() {
+    return this.x === this.gx && this.y === this.gy;
+  }
 
-  nextStep() { return this.path.length ? this.path[0] : null; }
+  nextStep() {
+    return this.path.length ? this.path[0] : null;
+  }
 
   advance() {
     const nxt = this.path.shift();
-    this.dx = nxt.dx; this.dy = nxt.dy;
-    this.x = nxt.x; this.y = nxt.y;
+    this.dx = nxt.dx;
+    this.dy = nxt.dy;
+    this.x = nxt.x;
+    this.y = nxt.y;
+    const klass = tileClass(this.x, this.y) || MAIN;
+    if (klass !== HIGHWAY) this.laneIndex = 0;
+    else if (Math.random() < 0.05) this.laneIndex = this.laneIndex === 0 ? 1 : 0;
+    const p = lanePoint(this.x, this.y, this.dx, this.dy, this.laneIndex);
+    this.targetRx = p.x;
+    this.targetRy = p.y;
     this.travelTime++;
     this.stopped = false;
-    // Set render target with RIGHT-HAND lane offset
-    this.targetRx = lanePixelX(this.x, this.dx, this.dy);
-    this.targetRy = lanePixelY(this.y, this.dx, this.dy);
-    this.lerpT = 0;
   }
 
   tickStopped() {
@@ -360,83 +584,68 @@ class Car {
   }
 
   updateRender(dt) {
-    // Smooth lerp toward target position
-    this.lerpT = Math.min(1, this.lerpT + dt * 6);
-    const t = easeInOut(this.lerpT);
-    this.rx += (this.targetRx - this.rx) * t * 0.35;
-    this.ry += (this.targetRy - this.ry) * t * 0.35;
+    const speed = this.stopped ? 7 : 11;
+    this.rx += (this.targetRx - this.rx) * Math.min(1, dt * speed);
+    this.ry += (this.targetRy - this.ry) * Math.min(1, dt * speed);
   }
 }
 
-function easeInOut(t) { return t < 0.5 ? 2*t*t : -1+(4-2*t)*t; }
-
-// Convert grid pos + direction → pixel centre with lane offset
-function lanePixelX(gx, dx, dy) {
-  const cx = gx * CELL + CELL/2;
-  // right-hand: eastbound stays in lower row → offset by +LANE_OFFSET in y, no x shift
-  // for horizontal movement, lane offset is in Y
-  if (dy !== 0) {
-    // vertical road: southbound on right (east) side, northbound on left (west) side
-    return cx + (dy > 0 ? LANE_OFFSET : -LANE_OFFSET);
-  }
-  return cx;
-}
-
-function lanePixelY(gy, dx, dy) {
-  const cy = gy * CELL + CELL/2;
-  if (dx !== 0) {
-    // horizontal road: eastbound on lower (south) side, westbound on upper (north) side
-    return cy + (dx > 0 ? LANE_OFFSET : -LANE_OFFSET);
-  }
-  return cy;
-}
-
-// ==========================================================
-//  SIMULATION ENGINE
-// ==========================================================
-const MAX_CARS = 60;
-const SPAWN_RATE = 0.5;
+const MAX_CARS = 140;
+const SPAWN_RATE = 0.62;
 let cars = [];
 let completed = [];
-let occupied = new Set(); // "gx,gy"
+let occupied = new Set();
 let interLocks = new Set();
 let tickCount = 0;
 let stoppedCount = 0;
 
-function oKey(x,y) { return `${x},${y}`; }
-
-function simReset() {
-  cars = []; completed = []; occupied.clear(); interLocks.clear(); tickCount = 0;
-  carIdCounter = 0;
+function oKey(x, y) {
+  return x + ',' + y;
 }
 
 function drivableTiles() {
-  const tiles = [];
-  for (let y=0;y<GRID_H;y++) for (let x=0;x<GRID_W;x++) if (isDrivable(x,y)) tiles.push({x,y});
-  return tiles;
+  const out = [];
+  for (let y = 0; y < GRID_H; y++) {
+    for (let x = 0; x < GRID_W; x++) {
+      if (isDrivable(x, y)) out.push({x, y});
+    }
+  }
+  return out;
+}
+
+function simReset() {
+  cars = [];
+  completed = [];
+  occupied = new Set();
+  interLocks = new Set();
+  tickCount = 0;
+  stoppedCount = 0;
+  carIdCounter = 0;
 }
 
 function spawnCar() {
   if (cars.length >= MAX_CARS) return;
   if (Math.random() > SPAWN_RATE) return;
+
   const tiles = drivableTiles();
   if (tiles.length < 2) return;
-  let start, dest, path, tries=0;
-  do {
-    start = tiles[Math.random()*tiles.length|0];
-    dest  = tiles[Math.random()*tiles.length|0];
-    if (occupied.has(oKey(start.x,start.y))) { tries++; continue; }
-    if (start.x===dest.x&&start.y===dest.y) { tries++; continue; }
-    path = astar(start.x,start.y,dest.x,dest.y);
-    tries++;
-  } while ((!path||path.length<2) && tries<15);
-  if (!path||path.length<2) return;
-  const car = new Car(start.x,start.y,dest.x,dest.y,path);
-  car.rx = lanePixelX(start.x, car.dx, car.dy);
-  car.ry = lanePixelY(start.y, car.dx, car.dy);
-  car.targetRx = car.rx; car.targetRy = car.ry;
-  cars.push(car);
-  occupied.add(oKey(start.x,start.y));
+
+  let tries = 0;
+  while (tries < 18) {
+    const start = tiles[Math.random() * tiles.length | 0];
+    const dest = tiles[Math.random() * tiles.length | 0];
+
+    if (start.x === dest.x && start.y === dest.y) { tries++; continue; }
+    if (occupied.has(oKey(start.x, start.y))) { tries++; continue; }
+
+    const path = astar(start.x, start.y, dest.x, dest.y);
+    if (!path || path.length < 2) { tries++; continue; }
+
+    const car = new Car(start.x, start.y, dest.x, dest.y, path);
+    cars.push(car);
+    occupied.add(oKey(start.x, start.y));
+    return;
+  }
 }
 
 function simStep() {
@@ -444,227 +653,316 @@ function simStep() {
   interLocks.clear();
   stoppedCount = 0;
 
-  // Shuffle for fairness
-  for (let i=cars.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[cars[i],cars[j]]=[cars[j],cars[i]];}
+  for (let i = cars.length - 1; i > 0; i--) {
+    const j = Math.random() * (i + 1) | 0;
+    const t = cars[i];
+    cars[i] = cars[j];
+    cars[j] = t;
+  }
 
   for (const car of cars) {
     car.stopped = false;
-    const nxt = car.nextStep();
-    if (!nxt) { if (!car.arrived) { const p=astar(car.x,car.y,car.gx,car.gy); if(p&&p.length>1)car.path=p.slice(1); } car.tickStopped(); stoppedCount++; continue; }
+    let nxt = car.nextStep();
 
-    // Collision check
-    if (occupied.has(oKey(nxt.x,nxt.y))) { car.tickStopped(); stoppedCount++; continue; }
-
-    // Intersection lock
-    if (grid[nxt.y][nxt.x]===INTER) {
-      if (interLocks.has(oKey(nxt.x,nxt.y))) { car.tickStopped(); stoppedCount++; car.waitAtInter++; continue; }
-      interLocks.add(oKey(nxt.x,nxt.y));
+    if (!nxt) {
+      if (!car.arrived) {
+        const p = astar(car.x, car.y, car.gx, car.gy);
+        if (p && p.length > 1) {
+          car.path = p.slice(1);
+          nxt = car.nextStep();
+        }
+      }
     }
 
-    occupied.delete(oKey(car.x,car.y));
+    if (!nxt) {
+      car.tickStopped();
+      stoppedCount++;
+      continue;
+    }
+
+    const nKey = oKey(nxt.x, nxt.y);
+    if (occupied.has(nKey)) {
+      car.tickStopped();
+      stoppedCount++;
+      continue;
+    }
+
+    if (grid[nxt.y][nxt.x] === INTER) {
+      if (interLocks.has(nKey)) {
+        car.tickStopped();
+        stoppedCount++;
+        continue;
+      }
+      interLocks.add(nKey);
+    }
+
+    occupied.delete(oKey(car.x, car.y));
     car.advance();
-    occupied.add(oKey(car.x,car.y));
+    occupied.add(oKey(car.x, car.y));
   }
 
-  // Remove arrived
-  cars = cars.filter(c => {
-    if (c.arrived) { occupied.delete(oKey(c.x,c.y)); completed.push(c); return false; }
+  cars = cars.filter(car => {
+    if (car.arrived) {
+      occupied.delete(oKey(car.x, car.y));
+      completed.push(car);
+      return false;
+    }
     return true;
   });
 
   spawnCar();
 }
 
-// ==========================================================
-//  CANVAS SETUP
-// ==========================================================
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
-canvas.width  = GRID_W * CELL;
-canvas.height = GRID_H * CELL;
-
-// Fit canvas to window
-function resize() {
-  const wrap = document.getElementById('canvas-wrap');
-  const ww = wrap.clientWidth, wh = wrap.clientHeight;
-  const scale = Math.min(ww/(GRID_W*CELL), wh/(GRID_H*CELL));
-  canvas.style.width  = (GRID_W*CELL*scale)+'px';
-  canvas.style.height = (GRID_H*CELL*scale)+'px';
-}
-window.addEventListener('resize', resize);
-
-// ==========================================================
-//  RENDERER
-// ==========================================================
-// Pre-generate building rects for each empty block
-let buildingCache = [];
-
-function genBuildings() {
+function generateBuildings() {
   buildingCache = [];
-  for (let cy=0;cy<GRID_H;cy++) {
-    for (let cx=0;cx<GRID_W;cx++) {
-      if (grid[cy][cx]!==EMPTY) continue;
-      const px=cx*CELL, py=cy*CELL;
-      const count = 1+Math.random()*3|0;
-      const buildings = [];
-      for (let i=0;i<count;i++) {
-        const m=3, bw=4+Math.random()*(CELL-m*2-8)|0, bh=4+Math.random()*(CELL-m*2-8)|0;
-        const bx=m+Math.random()*(CELL-m*2-bw)|0, by=m+Math.random()*(CELL-m*2-bh)|0;
-        const dark = Math.random()<0.5;
-        buildings.push({bx,by,bw,bh,dark});
+  for (let y = 0; y < GRID_H; y++) {
+    for (let x = 0; x < GRID_W; x++) {
+      if (grid[y][x] !== EMPTY) continue;
+      const px = x * CELL;
+      const py = y * CELL;
+      const blocks = [];
+      const count = 1 + (Math.random() * 2 | 0);
+      for (let i = 0; i < count; i++) {
+        const m = 4;
+        const bw = 6 + (Math.random() * (CELL - 2 * m - 7) | 0);
+        const bh = 6 + (Math.random() * (CELL - 2 * m - 7) | 0);
+        const bx = m + (Math.random() * Math.max(1, CELL - 2 * m - bw) | 0);
+        const by = m + (Math.random() * Math.max(1, CELL - 2 * m - bh) | 0);
+        blocks.push({bx, by, bw, bh, dark: Math.random() < 0.5, round: 1 + (Math.random() * 3 | 0)});
       }
-      buildingCache.push({cx,cy,px,py,buildings});
+      buildingCache.push({px, py, blocks, toneDark: Math.random() < 0.5, pad: 2 + (Math.random() * 2 | 0)});
     }
   }
 }
 
-function drawScene() {
-  const W=canvas.width, H=canvas.height;
-  ctx.fillStyle=C.bg;
-  ctx.fillRect(0,0,W,H);
+const ROAD_WIDTH = { [LOCAL]: 9, [MAIN]: 13, [HIGHWAY]: 19, [INTER]: 15 };
 
-  // --- Blocks (empty cells) ---
-  for (const b of buildingCache) {
-    // Block base
-    ctx.fillStyle=C.block;
-    ctx.fillRect(b.px+1,b.py+1,CELL-2,CELL-2);
-    // Buildings
-    for (const bld of b.buildings) {
-      ctx.fillStyle = bld.dark ? '#1a1c22':'#252830';
-      ctx.fillRect(b.px+bld.bx, b.py+bld.by, bld.bw, bld.bh);
-      // window glow
-      if (bld.bw>6 && bld.bh>6) {
-        ctx.fillStyle='rgba(180,160,80,0.07)';
-        ctx.fillRect(b.px+bld.bx+1,b.py+bld.by+1,bld.bw-2,bld.bh-2);
+function centerOf(x, y) {
+  return { x: x * CELL + CELL / 2, y: y * CELL + CELL / 2 };
+}
+
+function connectionClass(ax, ay, bx, by) {
+  const a = grid[ay][ax];
+  const b = grid[by][bx];
+  if (a === INTER && b === INTER) return MAIN;
+  if (a === INTER) return b;
+  if (b === INTER) return a;
+  return ROAD_RANK[a] >= ROAD_RANK[b] ? a : b;
+}
+
+function drawRoadLink(a, b, roadType, shadow = false) {
+  ctx.beginPath();
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(b.x, b.y);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = shadow ? 'rgba(0,0,0,0.28)' : ROAD_COLOR[roadType];
+  ctx.lineWidth = ROAD_WIDTH[roadType] + (shadow ? 4 : 0);
+  ctx.stroke();
+}
+
+function drawLaneDashes(a, b, roadType) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len = Math.hypot(dx, dy);
+  if (len < 2) return;
+
+  const nx = -dy / len;
+  const ny = dx / len;
+  const offsets = roadType === HIGHWAY ? [-4.8, 0, 4.8] : [0];
+  ctx.strokeStyle = C.lane;
+  ctx.lineWidth = 1;
+  ctx.lineCap = 'round';
+  ctx.setLineDash([6, 5]);
+  for (const off of offsets) {
+    ctx.beginPath();
+    ctx.moveTo(a.x + nx * off, a.y + ny * off);
+    ctx.lineTo(b.x + nx * off, b.y + ny * off);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+}
+
+function drawRoadNetwork() {
+  const links = [];
+  for (let y = 0; y < GRID_H; y++) {
+    for (let x = 0; x < GRID_W; x++) {
+      if (!isDrivable(x, y)) continue;
+      if (isDrivable(x + 1, y)) {
+        links.push({
+          a: centerOf(x, y),
+          b: centerOf(x + 1, y),
+          t: connectionClass(x, y, x + 1, y),
+        });
+      }
+      if (isDrivable(x, y + 1)) {
+        links.push({
+          a: centerOf(x, y),
+          b: centerOf(x, y + 1),
+          t: connectionClass(x, y, x, y + 1),
+        });
       }
     }
   }
 
-  // --- Roads ---
-  for (let y=0;y<GRID_H;y++) {
-    for (let x=0;x<GRID_W;x++) {
-      const t=grid[y][x];
-      if (t===EMPTY) continue;
-      const px=x*CELL, py=y*CELL;
+  for (const l of links) drawRoadLink(l.a, l.b, l.t, true);
+  for (const l of links) drawRoadLink(l.a, l.b, l.t, false);
+  for (const l of links) drawLaneDashes(l.a, l.b, l.t);
 
-      if (t===INTER) {
-        ctx.fillStyle=C.inter;
-        ctx.fillRect(px,py,CELL,CELL);
-        // Zebra crossing hint at edges
-        ctx.fillStyle='rgba(60,65,80,0.4)';
-        for (let i=0;i<CELL;i+=5) {
-          ctx.fillRect(px+i,py,2,3);
-          ctx.fillRect(px+i,py+CELL-3,2,3);
-          ctx.fillRect(px,py+i,3,2);
-          ctx.fillRect(px+CELL-3,py+i,3,2);
-        }
-        continue;
-      }
-
-      const isHwy = t===HIGHWAY;
-      const dir = cellDir[y][x];
-
-      ctx.fillStyle = isHwy ? C.highway : C.road_h;
-      ctx.fillRect(px,py,CELL,CELL);
-
-      // Lane divider
-      ctx.strokeStyle = isHwy ? 'rgba(90,140,200,0.25)' : 'rgba(80,85,110,0.35)';
-      ctx.lineWidth=1;
-      ctx.setLineDash([6,5]);
+  for (let y = 0; y < GRID_H; y++) {
+    for (let x = 0; x < GRID_W; x++) {
+      if (grid[y][x] !== INTER) continue;
+      const c = centerOf(x, y);
+      ctx.fillStyle = C.inter;
       ctx.beginPath();
-      if (dir==='h') {
-        ctx.moveTo(px,py+CELL/2); ctx.lineTo(px+CELL,py+CELL/2);
-      } else {
-        ctx.moveTo(px+CELL/2,py); ctx.lineTo(px+CELL/2,py+CELL);
-      }
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      // Kerb lines
-      ctx.strokeStyle='rgba(50,55,72,0.8)';
-      ctx.lineWidth=1;
-      if (dir==='h') {
-        ctx.strokeRect(px,py,CELL,CELL);
-      } else {
-        ctx.strokeRect(px,py,CELL,CELL);
-      }
-
-      // Highway edge highlight
-      if (isHwy) {
-        ctx.fillStyle='rgba(40,100,160,0.15)';
-        if (dir==='h') { ctx.fillRect(px,py,CELL,2); ctx.fillRect(px,py+CELL-2,CELL,2); }
-        else           { ctx.fillRect(px,py,2,CELL); ctx.fillRect(px+CELL-2,py,2,CELL); }
-      }
+      ctx.arc(c.x, c.y, ROAD_WIDTH[INTER] * 0.62, 0, Math.PI * 2);
+      ctx.fill();
     }
-  }
-
-  // --- Cars ---
-  for (const car of cars) {
-    drawCar(car);
   }
 }
 
 function drawCar(car) {
-  const cx = car.rx, cy = car.ry;
   const angle = Math.atan2(car.dy, car.dx);
   ctx.save();
-  ctx.translate(cx, cy);
+  ctx.translate(car.rx, car.ry);
   ctx.rotate(angle);
 
-  const l=car.len, w=car.wid;
+  const l = car.len;
+  const w = car.wid;
 
-  // Shadow
-  ctx.fillStyle='rgba(0,0,0,0.35)';
+  ctx.fillStyle = C.carShadow;
   ctx.beginPath();
-  ctx.ellipse(1,1,l/2+1,w/2+1,0,0,Math.PI*2);
+  ctx.ellipse(1.5, 1.5, l / 2 + 1, w / 2 + 1, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Body
-  ctx.fillStyle = car.stopped ? C.carStop : car.hue;
+  ctx.fillStyle = car.stopped ? C.carStop : car.color;
   ctx.beginPath();
-  ctx.roundRect(-l/2,-w/2,l,w,2);
+  ctx.roundRect(-l / 2, -w / 2, l, w, 2);
   ctx.fill();
 
-  // Roof darker stripe
-  ctx.fillStyle='rgba(0,0,0,0.25)';
-  ctx.fillRect(-l/2+2,-w/2+1,l-4,w-2);
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.fillRect(-l / 2 + 2, -w / 2 + 1, l - 4, w - 2);
 
-  // Headlights (front)
   if (!car.stopped) {
-    ctx.fillStyle=C.headlight;
+    ctx.fillStyle = C.headlight;
     ctx.beginPath();
-    ctx.ellipse(l/2+3,0,6,2,0,0,Math.PI*2);
+    ctx.ellipse(l / 2 + 2.8, 0, 5.2, 1.8, 0, 0, Math.PI * 2);
     ctx.fill();
   }
-
-  // Windscreen glint
-  ctx.fillStyle='rgba(255,255,255,0.18)';
-  ctx.fillRect(l/2-5,-w/2+1,3,w-2);
 
   ctx.restore();
 }
 
-// ==========================================================
-//  GAME LOOP
-// ==========================================================
-let paused = false;
-let speedMult = 1; // ticks per animation frame (roughly)
-let tickAccum = 0;
-let lastTime = 0;
-let tickInterval = 120; // ms between ticks
+function drawWorld() {
+  ctx.fillStyle = C.bg;
+  ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+
+  for (const b of buildingCache) {
+    const pad = b.pad;
+    ctx.fillStyle = b.toneDark ? C.lot : C.lotAlt;
+    ctx.beginPath();
+    ctx.roundRect(b.px + pad, b.py + pad, CELL - pad * 2, CELL - pad * 2, 5);
+    ctx.fill();
+    for (const r of b.blocks) {
+      ctx.fillStyle = r.dark ? C.roofA : C.roofB;
+      ctx.beginPath();
+      ctx.roundRect(b.px + r.bx, b.py + r.by, r.bw, r.bh, r.round);
+      ctx.fill();
+    }
+  }
+
+  drawRoadNetwork();
+
+  for (const car of cars) drawCar(car);
+}
+
+function drawScene() {
+  ctx.fillStyle = C.bg;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.save();
+  ctx.translate(view.panX, view.panY);
+  ctx.scale(view.zoom, view.zoom);
+  drawWorld();
+  ctx.restore();
+}
 
 function updateStats() {
   document.getElementById('s-tick').textContent = tickCount;
   document.getElementById('s-cars').textContent = cars.length;
   document.getElementById('s-done').textContent = completed.length;
   document.getElementById('s-stop').textContent = stoppedCount;
-  const all = [...cars,...completed];
-  const avg = all.length ? (all.reduce((s,c)=>s+c.travelTime,0)/all.length).toFixed(1) : '0.0';
+  const all = cars.concat(completed);
+  const avg = all.length ? (all.reduce((s, c) => s + c.travelTime, 0) / all.length).toFixed(1) : '0.0';
   document.getElementById('s-avg').textContent = avg;
+  document.getElementById('s-zoom').textContent = Math.round(view.zoom * 100) + '%';
 }
 
+function clamp(v, lo, hi) {
+  return Math.max(lo, Math.min(hi, v));
+}
+
+function resetView() {
+  const fit = Math.min(canvas.width / WORLD_W, canvas.height / WORLD_H) * 0.94;
+  view.zoom = clamp(fit, view.minZoom, view.maxZoom);
+  view.panX = (canvas.width - WORLD_W * view.zoom) / 2;
+  view.panY = (canvas.height - WORLD_H * view.zoom) / 2;
+}
+
+function resizeCanvas() {
+  const wrap = document.getElementById('canvas-wrap');
+  canvas.width = wrap.clientWidth;
+  canvas.height = wrap.clientHeight;
+  resetView();
+}
+
+function zoomAt(screenX, screenY, factor) {
+  const oldZoom = view.zoom;
+  const newZoom = clamp(oldZoom * factor, view.minZoom, view.maxZoom);
+  if (newZoom === oldZoom) return;
+
+  const worldX = (screenX - view.panX) / oldZoom;
+  const worldY = (screenY - view.panY) / oldZoom;
+  view.zoom = newZoom;
+  view.panX = screenX - worldX * newZoom;
+  view.panY = screenY - worldY * newZoom;
+}
+
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.12 : 0.89;
+  zoomAt(e.offsetX, e.offsetY, factor);
+}, { passive: false });
+
+canvas.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return;
+  view.dragging = true;
+  view.dragStartX = e.clientX - view.panX;
+  view.dragStartY = e.clientY - view.panY;
+  canvas.classList.add('dragging');
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (!view.dragging) return;
+  view.panX = e.clientX - view.dragStartX;
+  view.panY = e.clientY - view.dragStartY;
+});
+
+window.addEventListener('mouseup', () => {
+  view.dragging = false;
+  canvas.classList.remove('dragging');
+});
+
+window.addEventListener('resize', resizeCanvas);
+
+let paused = false;
+let speedMult = 1;
+let tickAccum = 0;
+let lastTime = 0;
+const tickInterval = 120;
+
 function loop(ts) {
-  const dt = Math.min((ts - lastTime)/1000, 0.1);
+  const dt = Math.min((ts - lastTime) / 1000, 0.1);
   lastTime = ts;
 
   if (!paused) {
@@ -676,7 +974,6 @@ function loop(ts) {
     }
   }
 
-  // Update car render positions every frame
   for (const car of cars) car.updateRender(dt);
 
   drawScene();
@@ -684,36 +981,37 @@ function loop(ts) {
   requestAnimationFrame(loop);
 }
 
-// ==========================================================
-//  CONTROLS
-// ==========================================================
+function setSpeed(mult) {
+  speedMult = mult;
+  document.getElementById('btn-slow').classList.remove('active');
+  document.getElementById('btn-norm').classList.remove('active');
+  document.getElementById('btn-fast').classList.remove('active');
+  document.getElementById(mult === 0.5 ? 'btn-slow' : mult === 1 ? 'btn-norm' : 'btn-fast').classList.add('active');
+}
+
+document.getElementById('btn-slow').onclick = () => setSpeed(0.5);
+document.getElementById('btn-norm').onclick = () => setSpeed(1);
+document.getElementById('btn-fast').onclick = () => setSpeed(3);
+
 document.getElementById('btn-pause').onclick = function() {
   paused = !paused;
-  this.textContent = paused ? '▶ Resume' : '⏸ Pause';
+  this.textContent = paused ? 'Resume' : 'Pause';
   this.classList.toggle('active', paused);
 };
 
-function setSpeed(mult) {
-  speedMult = mult;
-  ['btn-slow','btn-norm','btn-fast'].forEach(id=>document.getElementById(id).classList.remove('active'));
-  document.getElementById(mult===0.5?'btn-slow':mult===1?'btn-norm':'btn-fast').classList.add('active');
-}
-document.getElementById('btn-slow').onclick = ()=>setSpeed(0.5);
-document.getElementById('btn-norm').onclick = ()=>setSpeed(1);
-document.getElementById('btn-fast').onclick = ()=>setSpeed(3);
+document.getElementById('btn-zin').onclick = () => zoomAt(canvas.width * 0.5, canvas.height * 0.5, 1.12);
+document.getElementById('btn-zout').onclick = () => zoomAt(canvas.width * 0.5, canvas.height * 0.5, 0.89);
+document.getElementById('btn-zreset').onclick = () => resetView();
 
-// ==========================================================
-//  INIT
-// ==========================================================
 buildCity();
-genBuildings();
+generateBuildings();
 simReset();
-
-// Pre-warm: spawn some cars
-for (let i=0;i<8;i++) spawnCar();
-
-resize();
-requestAnimationFrame(ts => { lastTime = ts; requestAnimationFrame(loop); });
+for (let i = 0; i < 20; i++) spawnCar();
+resizeCanvas();
+requestAnimationFrame((ts) => {
+  lastTime = ts;
+  requestAnimationFrame(loop);
+});
 </script>
 </body>
 </html>
