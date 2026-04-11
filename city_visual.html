@@ -207,10 +207,12 @@ const CELL = 24;
 
 const ROAD_RANK = { [LOCAL]: 1, [MAIN]: 2, [HIGHWAY]: 3 };
 const CLASS_BIT = { [LOCAL]: 1, [MAIN]: 2, [HIGHWAY]: 4 };
-const ROAD_COLOR = { [LOCAL]: '#3f485d', [MAIN]: '#2f638f', [HIGHWAY]: '#216e7f' };
+const ROAD_COLOR = { [LOCAL]: '#3f485d', [MAIN]: '#2f638f', [HIGHWAY]: '#1e7f90' };
 
 const C = {
   bg: '#131722',
+  fringe: '#0e121b',
+  fringe2: '#101725',
   block: '#1d2231',
   blockAlt: '#192031',
   lot: '#243048',
@@ -219,6 +221,9 @@ const C = {
   roofB: '#6c7c9b',
   inter: '#2f3344',
   lane: 'rgba(214,222,240,0.18)',
+  laneSoft: 'rgba(214,222,240,0.11)',
+  hwyEdge: 'rgba(190,230,240,0.22)',
+  hwyMedian: 'rgba(12,28,35,0.56)',
   carStop: '#e76464',
   carShadow: 'rgba(0,0,0,0.45)',
   headlight: 'rgba(255,245,170,0.55)',
@@ -227,6 +232,7 @@ const C = {
 let grid = [];
 let dirGrid = [];
 let interMask = [];
+let cityMask = [];
 let buildingCache = [];
 
 const canvas = document.getElementById('c');
@@ -254,18 +260,23 @@ function resetArrays() {
   grid = create2D(GRID_H, GRID_W, EMPTY);
   dirGrid = create2D(GRID_H, GRID_W, null);
   interMask = create2D(GRID_H, GRID_W, 0);
+  cityMask = create2D(GRID_H, GRID_W, false);
 }
 
 function inBounds(x, y) {
   return x >= 0 && y >= 0 && x < GRID_W && y < GRID_H;
 }
 
+function inCity(x, y) {
+  return inBounds(x, y) && cityMask[y][x];
+}
+
 function isDrivable(x, y) {
-  return inBounds(x, y) && grid[y][x] !== EMPTY;
+  return inCity(x, y) && grid[y][x] !== EMPTY;
 }
 
 function setRoad(x, y, roadType, dir) {
-  if (!inBounds(x, y)) return;
+  if (!inCity(x, y)) return;
   const cur = grid[y][x];
   const curDir = dirGrid[y][x];
 
@@ -295,6 +306,29 @@ function buildCity() {
 
   const clampI = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
+  function buildCityMask() {
+    const cx = GRID_W * 0.52;
+    const cy = GRID_H * 0.53;
+    const rx = GRID_W * 0.50;
+    const ry = GRID_H * 0.46;
+
+    for (let y = 0; y < GRID_H; y++) {
+      for (let x = 0; x < GRID_W; x++) {
+        const nx = (x - cx) / rx;
+        const ny = (y - cy) / ry;
+        const ang = Math.atan2(ny, nx);
+        const wobble =
+          0.12 * Math.sin(ang * 3.0 + 0.8) +
+          0.08 * Math.sin(ang * 5.0 - 1.4) +
+          0.05 * Math.sin((x + y) * 0.12);
+        const d = Math.pow(Math.abs(nx), 2.2) + Math.pow(Math.abs(ny), 2.2);
+        cityMask[y][x] = d <= (1.0 + wobble);
+      }
+    }
+  }
+
+  buildCityMask();
+
   function uniqueStarts(base, count, minGap, maxVal) {
     const out = [];
     let cur = base;
@@ -310,7 +344,7 @@ function buildCity() {
     let y = clampI(startY, 1, GRID_H - 2);
     for (let x = 0; x < GRID_W; x++) {
       setRoad(x, y, roadType, 'h');
-      if (x > 2 && x < GRID_W - 3 && Math.random() < turnChance) {
+      if (roadType !== HIGHWAY && x > 2 && x < GRID_W - 3 && Math.random() < turnChance) {
         const nextY = clampI(y + (Math.random() < 0.5 ? -1 : 1), 1, GRID_H - 2);
         if (nextY !== y) {
           setRoad(x, nextY, roadType, 'v');
@@ -325,7 +359,7 @@ function buildCity() {
     let x = clampI(startX, 1, GRID_W - 2);
     for (let y = 0; y < GRID_H; y++) {
       setRoad(x, y, roadType, 'v');
-      if (y > 2 && y < GRID_H - 3 && Math.random() < turnChance) {
+      if (roadType !== HIGHWAY && y > 2 && y < GRID_H - 3 && Math.random() < turnChance) {
         const nextX = clampI(x + (Math.random() < 0.5 ? -1 : 1), 1, GRID_W - 2);
         if (nextX !== x) {
           setRoad(nextX, y, roadType, 'h');
@@ -336,51 +370,193 @@ function buildCity() {
     }
   }
 
-  // Backbone network: a few long arterials with gentle bends.
-  const hHighway = [
-    clampI(Math.floor(GRID_H * 0.26), 2, GRID_H - 3),
-    clampI(Math.floor(GRID_H * 0.70), 2, GRID_H - 3),
-  ];
-  const vHighway = [
-    clampI(Math.floor(GRID_W * 0.30), 2, GRID_W - 3),
-    clampI(Math.floor(GRID_W * 0.74), 2, GRID_W - 3),
-  ];
-  for (const y of hHighway) carveHorizontal(y, HIGHWAY, 0.05);
-  for (const x of vHighway) carveVertical(x, HIGHWAY, 0.05);
+  function carveClosedHighwayLoop(left, top, right, bottom, wobble = 0) {
+    const lx = clampI(left, 1, GRID_W - 2);
+    const rx = clampI(right, lx + 2, GRID_W - 1);
+    const ty = clampI(top, 1, GRID_H - 2);
+    const by = clampI(bottom, ty + 2, GRID_H - 1);
+    const topPath = [];
+    const rightPath = [];
+    const bottomPath = [];
+    const leftPath = [];
 
-  const hMain = uniqueStarts(2, 5, 7, GRID_H).filter(y => !hHighway.includes(y));
-  const vMain = uniqueStarts(3, 6, 9, GRID_W).filter(x => !vHighway.includes(x));
+    const pushTile = (x, y, dir) => {
+      if (!inBounds(x, y)) return;
+      cityMask[y][x] = true;
+      setRoad(x, y, HIGHWAY, dir);
+    };
+
+    const stitch = (ax, ay, bx, by) => {
+      let x = ax;
+      let y = ay;
+      pushTile(x, y, 'h');
+      while (x !== bx) {
+        x += Math.sign(bx - x);
+        pushTile(x, y, 'h');
+      }
+      while (y !== by) {
+        y += Math.sign(by - y);
+        pushTile(x, y, 'v');
+      }
+    };
+
+    for (let x = lx; x <= rx; x++) {
+      const y = clampI(ty + Math.round(Math.sin((x - lx) / Math.max(1, rx - lx) * Math.PI) * wobble), 1, GRID_H - 2);
+      topPath.push([x, y]);
+    }
+    for (let y = ty; y <= by; y++) {
+      const x = clampI(rx + Math.round(Math.sin((y - ty) / Math.max(1, by - ty) * Math.PI) * wobble), 1, GRID_W - 2);
+      rightPath.push([x, y]);
+    }
+    for (let x = rx; x >= lx; x--) {
+      const y = clampI(by - Math.round(Math.sin((rx - x) / Math.max(1, rx - lx) * Math.PI) * wobble), 1, GRID_H - 2);
+      bottomPath.push([x, y]);
+    }
+    for (let y = by; y >= ty; y--) {
+      const x = clampI(lx - Math.round(Math.sin((by - y) / Math.max(1, by - ty) * Math.PI) * wobble), 1, GRID_W - 2);
+      leftPath.push([x, y]);
+    }
+
+    const loop = topPath
+      .concat(rightPath.slice(1))
+      .concat(bottomPath.slice(1))
+      .concat(leftPath.slice(1));
+
+    for (let i = 1; i < loop.length; i++) {
+      stitch(loop[i - 1][0], loop[i - 1][1], loop[i][0], loop[i][1]);
+    }
+    if (loop.length > 1) {
+      stitch(loop[loop.length - 1][0], loop[loop.length - 1][1], loop[0][0], loop[0][1]);
+    }
+  }
+
+  // Closed highway loops: no dead-end highway tiles.
+  const outerLeft = clampI(Math.floor(GRID_W * 0.12), 2, GRID_W - 8);
+  const outerRight = clampI(Math.floor(GRID_W * 0.88), outerLeft + 8, GRID_W - 3);
+  const outerTop = clampI(Math.floor(GRID_H * 0.16), 2, GRID_H - 8);
+  const outerBottom = clampI(Math.floor(GRID_H * 0.84), outerTop + 8, GRID_H - 3);
+
+  const innerLeft = clampI(Math.floor(GRID_W * 0.30), 4, GRID_W - 10);
+  const innerRight = clampI(Math.floor(GRID_W * 0.70), innerLeft + 8, GRID_W - 4);
+  const innerTop = clampI(Math.floor(GRID_H * 0.34), 4, GRID_H - 10);
+  const innerBottom = clampI(Math.floor(GRID_H * 0.66), innerTop + 8, GRID_H - 4);
+
+  carveClosedHighwayLoop(outerLeft, outerTop, outerRight, outerBottom, 1);
+  carveClosedHighwayLoop(innerLeft, innerTop, innerRight, innerBottom, 1);
+
+  // Main roads cross the loops and form the city's internal structure.
+  const hMain = uniqueStarts(2, 5, 7, GRID_H).filter(y => y !== outerTop && y !== outerBottom && y !== innerTop && y !== innerBottom);
+  const vMain = uniqueStarts(3, 6, 9, GRID_W).filter(x => x !== outerLeft && x !== outerRight && x !== innerLeft && x !== innerRight);
   for (const y of hMain) carveHorizontal(y, MAIN, 0.13);
   for (const x of vMain) carveVertical(x, MAIN, 0.13);
 
-  // Local streets branch from existing roads as short, irregular collectors.
-  const seedTiles = [];
-  for (let y = 1; y < GRID_H - 1; y++) {
-    for (let x = 1; x < GRID_W - 1; x++) {
-      if (grid[y][x] === MAIN) seedTiles.push({x, y});
-    }
-  }
-
-  const localBranches = Math.floor((GRID_W * GRID_H) * 0.045);
-  for (let i = 0; i < localBranches; i++) {
-    const seed = seedTiles[Math.random() * seedTiles.length | 0];
-    if (!seed) continue;
-    let x = seed.x;
-    let y = seed.y;
+  // Local streets branch off main roads and then off other local streets.
+  function carveLocalBranch(seedX, seedY, maxLen) {
+    let x = seedX;
+    let y = seedY;
     let horizontal = Math.random() < 0.5;
-    const len = 2 + (Math.random() * 5 | 0);
-    for (let k = 0; k < len; k++) {
+    for (let k = 0; k < maxLen; k++) {
       x += horizontal ? (Math.random() < 0.5 ? -1 : 1) : 0;
       y += horizontal ? 0 : (Math.random() < 0.5 ? -1 : 1);
-      if (!inBounds(x, y)) break;
-      if (grid[y][x] === HIGHWAY) break;
-      if (grid[y][x] === MAIN && Math.random() < 0.55) break;
+      if (!inBounds(x, y) || !inCity(x, y)) break;
+      if (grid[y][x] !== EMPTY) break;
       setRoad(x, y, LOCAL, horizontal ? 'h' : 'v');
-      if (Math.random() < 0.12) horizontal = !horizontal;
+      if (Math.random() < 0.18) horizontal = !horizontal;
     }
   }
 
-  // Intersections default to local+main if the crossing source is unknown.
+  const mainSeeds = [];
+  const localSeeds = [];
+  for (let y = 1; y < GRID_H - 1; y++) {
+    for (let x = 1; x < GRID_W - 1; x++) {
+      if (grid[y][x] === MAIN) mainSeeds.push({x, y});
+      if (grid[y][x] === LOCAL) localSeeds.push({x, y});
+    }
+  }
+
+  const localBranchesFromMain = Math.floor((GRID_W * GRID_H) * 0.075);
+  for (let i = 0; i < localBranchesFromMain; i++) {
+    const seed = mainSeeds[Math.random() * mainSeeds.length | 0];
+    if (!seed) continue;
+    carveLocalBranch(seed.x, seed.y, 3 + (Math.random() * 6 | 0));
+  }
+
+  const localBranchesFromLocal = Math.floor((GRID_W * GRID_H) * 0.045);
+  for (let i = 0; i < localBranchesFromLocal; i++) {
+    const seed = localSeeds[Math.random() * localSeeds.length | 0];
+    if (!seed) continue;
+    carveLocalBranch(seed.x, seed.y, 2 + (Math.random() * 4 | 0));
+  }
+
+  function roadClassAt(x, y) {
+    const t = grid[y][x];
+    if (t === HIGHWAY || t === MAIN || t === LOCAL) return t;
+    if (t === INTER) {
+      const mask = interMask[y][x] || 0;
+      if (mask & CLASS_BIT[HIGHWAY]) return HIGHWAY;
+      if (mask & CLASS_BIT[MAIN]) return MAIN;
+      return LOCAL;
+    }
+    return null;
+  }
+
+  function orientFromPair(a, b) {
+    const sameX = a.x === b.x;
+    const sameY = a.y === b.y;
+    if (sameY) return 'h';
+    if (sameX) return 'v';
+    return null;
+  }
+
+  // Smart intersection cleanup: keep true junctions, downgrade fake/degenerate ones.
+  for (let y = 0; y < GRID_H; y++) {
+    for (let x = 0; x < GRID_W; x++) {
+      if (grid[y][x] !== INTER) continue;
+
+      const nbrs = [];
+      const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+      for (const d of dirs) {
+        const nx = x + d[0];
+        const ny = y + d[1];
+        if (!inCity(nx, ny)) continue;
+        if (grid[ny][nx] === EMPTY) continue;
+        nbrs.push({ x: nx, y: ny, t: grid[ny][nx], cls: roadClassAt(nx, ny) });
+      }
+
+      if (nbrs.length <= 1) {
+        if (nbrs.length === 0) {
+          grid[y][x] = EMPTY;
+          dirGrid[y][x] = null;
+          interMask[y][x] = 0;
+          continue;
+        }
+        grid[y][x] = nbrs[0].cls || LOCAL;
+        dirGrid[y][x] = (nbrs[0].x === x) ? 'v' : 'h';
+        interMask[y][x] = 0;
+        continue;
+      }
+
+      if (nbrs.length === 2) {
+        const dir = orientFromPair(nbrs[0], nbrs[1]);
+        if (dir !== null) {
+          const cls = Math.max(nbrs[0].cls || LOCAL, nbrs[1].cls || LOCAL);
+          grid[y][x] = cls;
+          dirGrid[y][x] = dir;
+          interMask[y][x] = 0;
+          continue;
+        }
+      }
+
+      // True junction (3+ connections, or 2-way corner) stays intersection.
+      let mask = 0;
+      for (const n of nbrs) {
+        if (n.cls != null) mask |= CLASS_BIT[n.cls];
+      }
+      interMask[y][x] = mask || (CLASS_BIT[LOCAL] | CLASS_BIT[MAIN]);
+      dirGrid[y][x] = 'b';
+    }
+  }
+
   for (let y = 0; y < GRID_H; y++) {
     for (let x = 0; x < GRID_W; x++) {
       if (grid[y][x] === INTER && interMask[y][x] === 0) {
@@ -714,10 +890,67 @@ function simStep() {
 }
 
 function generateBuildings() {
+  function hasResidentialFrontage(x, y) {
+    const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (const d of dirs) {
+      const nx = x + d[0];
+      const ny = y + d[1];
+      if (!inCity(nx, ny)) continue;
+      const t = grid[ny][nx];
+      if (t === LOCAL || t === MAIN) return true;
+      if (t === INTER) {
+        const mask = interMask[ny][nx] || 0;
+        if ((mask & CLASS_BIT[LOCAL]) || (mask & CLASS_BIT[MAIN])) return true;
+      }
+    }
+    return false;
+  }
+
+  function frontageType(x, y) {
+    const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    let hasLocal = false;
+    let hasMain = false;
+    for (const d of dirs) {
+      const nx = x + d[0];
+      const ny = y + d[1];
+      if (!inCity(nx, ny)) continue;
+      const t = grid[ny][nx];
+      if (t === MAIN) hasMain = true;
+      if (t === LOCAL) hasLocal = true;
+      if (t === INTER) {
+        const mask = interMask[ny][nx] || 0;
+        if (mask & CLASS_BIT[MAIN]) hasMain = true;
+        if (mask & CLASS_BIT[LOCAL]) hasLocal = true;
+      }
+    }
+    if (hasLocal) return LOCAL;
+    if (hasMain) return MAIN;
+    return null;
+  }
+
+  function lotFillChance(x, y) {
+    const cx = (GRID_W - 1) / 2;
+    const cy = (GRID_H - 1) / 2;
+    const dx = (x - cx) / (GRID_W / 2);
+    const dy = (y - cy) / (GRID_H / 2);
+    const dist = Math.min(1, Math.sqrt(dx * dx + dy * dy));
+    const coreBias = 0.64 + (1 - dist) * 0.20;
+    const frontage = frontageType(x, y);
+    const frontageBias = frontage === LOCAL ? 0.34 : frontage === MAIN ? 0.02 : 0.0;
+    return Math.min(0.98, coreBias + frontageBias);
+  }
+
   buildingCache = [];
   for (let y = 0; y < GRID_H; y++) {
     for (let x = 0; x < GRID_W; x++) {
+      if (!inCity(x, y)) continue;
       if (grid[y][x] !== EMPTY) continue;
+      if (!hasResidentialFrontage(x, y)) continue;
+
+      // Density is heavier near the city core and along main streets.
+      // Edge lots and local-frontage parcels stay more open.
+      if (Math.random() > lotFillChance(x, y)) continue;
+
       const px = x * CELL;
       const py = y * CELL;
       const blocks = [];
@@ -759,6 +992,15 @@ function drawRoadLink(a, b, roadType, shadow = false) {
   ctx.strokeStyle = shadow ? 'rgba(0,0,0,0.28)' : ROAD_COLOR[roadType];
   ctx.lineWidth = ROAD_WIDTH[roadType] + (shadow ? 4 : 0);
   ctx.stroke();
+
+  if (!shadow && roadType === HIGHWAY) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = ROAD_WIDTH[HIGHWAY] * 0.64;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  }
 }
 
 function drawLaneDashes(a, b, roadType) {
@@ -769,12 +1011,43 @@ function drawLaneDashes(a, b, roadType) {
 
   const nx = -dy / len;
   const ny = dx / len;
-  const offsets = roadType === HIGHWAY ? [-4.8, 0, 4.8] : [0];
+  ctx.lineCap = 'round';
+
+  if (roadType === HIGHWAY) {
+    for (const off of [-6.5, 6.5]) {
+      ctx.strokeStyle = C.hwyEdge;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(a.x + nx * off, a.y + ny * off);
+      ctx.lineTo(b.x + nx * off, b.y + ny * off);
+      ctx.stroke();
+    }
+
+    for (const off of [-2.2, 2.2]) {
+      ctx.strokeStyle = C.laneSoft;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([5, 6]);
+      ctx.beginPath();
+      ctx.moveTo(a.x + nx * off, a.y + ny * off);
+      ctx.lineTo(b.x + nx * off, b.y + ny * off);
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = C.hwyMedian;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    return;
+  }
+
   ctx.strokeStyle = C.lane;
   ctx.lineWidth = 1;
-  ctx.lineCap = 'round';
   ctx.setLineDash([6, 5]);
-  for (const off of offsets) {
+  for (const off of [0]) {
     ctx.beginPath();
     ctx.moveTo(a.x + nx * off, a.y + ny * off);
     ctx.lineTo(b.x + nx * off, b.y + ny * off);
@@ -805,6 +1078,7 @@ function drawRoadNetwork() {
     }
   }
 
+  links.sort((a, b) => ROAD_RANK[a.t] - ROAD_RANK[b.t]);
   for (const l of links) drawRoadLink(l.a, l.b, l.t, true);
   for (const l of links) drawRoadLink(l.a, l.b, l.t, false);
   for (const l of links) drawLaneDashes(l.a, l.b, l.t);
@@ -854,8 +1128,18 @@ function drawCar(car) {
 }
 
 function drawWorld() {
-  ctx.fillStyle = C.bg;
+  ctx.fillStyle = C.fringe;
   ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+
+  for (let y = 0; y < GRID_H; y++) {
+    for (let x = 0; x < GRID_W; x++) {
+      if (cityMask[y][x]) continue;
+      const px = x * CELL;
+      const py = y * CELL;
+      ctx.fillStyle = ((x + y) % 3 === 0) ? C.fringe2 : C.fringe;
+      ctx.fillRect(px, py, CELL, CELL);
+    }
+  }
 
   for (const b of buildingCache) {
     const pad = b.pad;
