@@ -150,6 +150,128 @@
     padding: 8px 10px;
   }
 
+  #gen-progress {
+    position: absolute;
+    left: 12px;
+    top: 12px;
+    min-width: 260px;
+    max-width: 360px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    background: rgba(29, 33, 44, 0.92);
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--text);
+    z-index: 20;
+    display: none;
+  }
+
+  #gen-progress .title {
+    color: var(--accent);
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    margin-bottom: 6px;
+  }
+
+  #gen-progress .bar {
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+    margin: 6px 0;
+  }
+
+  #gen-progress .fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #4eb2c3, #f4c24f);
+    transition: width 0.15s linear;
+  }
+
+  #gen-progress .meta {
+    color: var(--muted);
+    white-space: pre-line;
+    font-size: 10px;
+  }
+
+  #tune-panel {
+    position: absolute;
+    right: 12px;
+    top: 12px;
+    width: min(320px, calc(100vw - 24px));
+    max-height: calc(100vh - 140px);
+    overflow: auto;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    background: rgba(29, 33, 44, 0.94);
+    font-size: 11px;
+    z-index: 18;
+  }
+
+  #tune-panel .title {
+    color: var(--accent);
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    margin-bottom: 8px;
+  }
+
+  .tune-group {
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .tune-group:last-of-type {
+    border-bottom: none;
+    margin-bottom: 8px;
+  }
+
+  .tune-group h3 {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .tune-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+
+  .tune-row label {
+    font-size: 10px;
+    color: var(--text);
+  }
+
+  .tune-row .val {
+    min-width: 34px;
+    text-align: right;
+    color: var(--accent);
+    font-size: 10px;
+  }
+
+  .tune-row input[type='range'] {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .tune-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .tune-actions button {
+    flex: 1;
+  }
+
   @media (max-width: 900px) {
     #header { gap: 10px; padding: 8px 10px; }
     #header h1 { font-size: 12px; }
@@ -157,6 +279,12 @@
     .stat { min-width: 58px; }
     .stat .v { font-size: 13px; }
     .controls { justify-content: center; }
+    #tune-panel {
+      width: min(300px, calc(100vw - 24px));
+      max-height: 48vh;
+      top: auto;
+      bottom: 52px;
+    }
   }
 </style>
 </head>
@@ -185,6 +313,48 @@
 
 <div id="canvas-wrap">
   <canvas id="c"></canvas>
+  <div id="gen-progress">
+    <div class="title">Generating City...</div>
+    <div id="gen-phase">Starting</div>
+    <div class="bar"><div id="gen-fill" class="fill"></div></div>
+    <div id="gen-meta" class="meta"></div>
+  </div>
+  <div id="tune-panel">
+    <div class="title">Generation Tuning</div>
+    <div class="tune-group">
+      <h3>Highways</h3>
+      <div class="tune-row"><label for="t-highway-seeds">Seed Count</label><span class="val" id="v-highway-seeds"></span><input id="t-highway-seeds" type="range" min="2" max="10" step="1"></div>
+      <div class="tune-row"><label for="t-highway-minlen">Min Length Ratio</label><span class="val" id="v-highway-minlen"></span><input id="t-highway-minlen" type="range" min="0.2" max="0.8" step="0.01"></div>
+      <div class="tune-row"><label for="t-highway-maxlen">Max Length Mult</label><span class="val" id="v-highway-maxlen"></span><input id="t-highway-maxlen" type="range" min="1.0" max="2.6" step="0.05"></div>
+    </div>
+    <div class="tune-group">
+      <h3>Main Roads</h3>
+      <div class="tune-row"><label for="t-main-max">Branch Cap</label><span class="val" id="v-main-max"></span><input id="t-main-max" type="range" min="80" max="420" step="5"></div>
+      <div class="tune-row"><label for="t-main-factor">Trunk Factor</label><span class="val" id="v-main-factor"></span><input id="t-main-factor" type="range" min="0.2" max="1.2" step="0.01"></div>
+      <div class="tune-row"><label for="t-main-skip">Skip Chance</label><span class="val" id="v-main-skip"></span><input id="t-main-skip" type="range" min="0.02" max="0.4" step="0.01"></div>
+    </div>
+    <div class="tune-group">
+      <h3>Local Roads</h3>
+      <div class="tune-row"><label for="t-local-base">Base Cap</label><span class="val" id="v-local-base"></span><input id="t-local-base" type="range" min="600" max="2800" step="20"></div>
+      <div class="tune-row"><label for="t-local-area">Area Factor</label><span class="val" id="v-local-area"></span><input id="t-local-area" type="range" min="0.01" max="0.12" step="0.005"></div>
+      <div class="tune-row"><label for="t-local-main">Main Influence</label><span class="val" id="v-local-main"></span><input id="t-local-main" type="range" min="0.8" max="3.0" step="0.05"></div>
+      <div class="tune-row"><label for="t-local-branch">Branch Extra</label><span class="val" id="v-local-branch"></span><input id="t-local-branch" type="range" min="0" max="2.2" step="0.05"></div>
+      <div class="tune-row"><label for="t-local-loop">Loop Chance</label><span class="val" id="v-local-loop"></span><input id="t-local-loop" type="range" min="0" max="0.5" step="0.01"></div>
+    </div>
+    <div class="tune-group">
+      <h3>Housing + Cleanup</h3>
+      <div class="tune-row"><label for="t-house-mult">Housing Mult</label><span class="val" id="v-house-mult"></span><input id="t-house-mult" type="range" min="1" max="8" step="1"></div>
+      <div class="tune-row"><label for="t-local-frontage">Local Frontage Bias</label><span class="val" id="v-local-frontage"></span><input id="t-local-frontage" type="range" min="0.2" max="0.9" step="0.01"></div>
+      <div class="tune-row"><label for="t-near-local">Nearby Local Bias Cap</label><span class="val" id="v-near-local"></span><input id="t-near-local" type="range" min="0.1" max="0.6" step="0.01"></div>
+      <div class="tune-row"><label for="t-main-frontage-cap">Main Frontage Cap</label><span class="val" id="v-main-frontage-cap"></span><input id="t-main-frontage-cap" type="range" min="0.04" max="0.3" step="0.01"></div>
+      <div class="tune-row"><label for="t-infill">Infill Chance</label><span class="val" id="v-infill"></span><input id="t-infill" type="range" min="0.1" max="0.95" step="0.01"></div>
+      <div class="tune-row"><label for="t-edge-local">Edge Prune Local</label><span class="val" id="v-edge-local"></span><input id="t-edge-local" type="range" min="0" max="1" step="0.01"></div>
+      <div class="tune-row"><label for="t-edge-main">Edge Prune Main</label><span class="val" id="v-edge-main"></span><input id="t-edge-main" type="range" min="0" max="1" step="0.01"></div>
+    </div>
+    <div class="tune-actions">
+      <button id="btn-apply-regenerate">Apply + Regenerate</button>
+    </div>
+  </div>
   <div id="legend">
     <div class="leg"><span class="swatch" style="background:#3f485d"></span>Local road</div>
     <div class="leg"><span class="swatch" style="background:#2f638f"></span>Main street</div>
@@ -201,9 +371,32 @@ const MAIN = 2;
 const HIGHWAY = 3;
 const INTER = 4;
 
-const GRID_W = 64;
-const GRID_H = 46;
+const GRID_W = 192;
+const GRID_H = 138;
 const CELL = 24;
+
+const TUNE_DEFAULTS = {
+  highwaySeeds: 5,
+  highwayMinLenRatio: 0.45,
+  highwayMaxLenMult: 1.8,
+  mainBranchCap: 180,
+  mainFromHighwayFactor: 0.5,
+  mainSkipChance: 0.2,
+  localBaseCap: 1200,
+  localAreaFactor: 0.05,
+  localFromMainFactor: 1.6,
+  localBranchExtra: 0.8,
+  localLoopChance: 0.16,
+  edgePruneLocal: 0.75,
+  edgePruneMain: 0.55,
+  houseSpawnMult: 3,
+  localFrontageBias: 0.52,
+  nearLocalBiasCap: 0.28,
+  mainFrontageCap: 0.12,
+  infillChance: 0.52,
+};
+
+const tuning = { ...TUNE_DEFAULTS };
 
 const ROAD_RANK = { [LOCAL]: 1, [MAIN]: 2, [HIGHWAY]: 3 };
 const CLASS_BIT = { [LOCAL]: 1, [MAIN]: 2, [HIGHWAY]: 4 };
@@ -240,7 +433,7 @@ const ctx = canvas.getContext('2d');
 
 const view = {
   zoom: 1,
-  minZoom: 0.45,
+  minZoom: 0.08,
   maxZoom: 2.8,
   panX: 0,
   panY: 0,
@@ -264,11 +457,11 @@ function resetArrays() {
 }
 
 function inBounds(x, y) {
-  return x >= 0 && y >= 0 && x < GRID_W && y < GRID_H;
+  return Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < GRID_W && y < GRID_H;
 }
 
 function inCity(x, y) {
-  return inBounds(x, y) && cityMask[y][x];
+  return inBounds(x, y) && cityMask[y] != null && cityMask[y][x] === true;
 }
 
 function isDrivable(x, y) {
@@ -301,10 +494,10 @@ function setRoad(x, y, roadType, dir) {
   interMask[y][x] = (CLASS_BIT[cur] || 0) | (CLASS_BIT[roadType] || 0);
 }
 
-function buildCity() {
+async function buildCity(onProgress = null) {
   resetArrays();
 
-  const clampI = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const clampI = (v, lo, hi) => Math.floor(Math.max(lo, Math.min(hi, v)));
 
   function buildCityMask() {
     const cx = GRID_W * 0.52;
@@ -327,167 +520,6 @@ function buildCity() {
     }
   }
 
-  buildCityMask();
-
-  function uniqueStarts(base, count, minGap, maxVal) {
-    const out = [];
-    let cur = base;
-    for (let i = 0; i < count; i++) {
-      cur += minGap + (Math.random() * minGap | 0);
-      if (cur >= maxVal - 2) break;
-      out.push(cur);
-    }
-    return out;
-  }
-
-  function carveHorizontal(startY, roadType, turnChance = 0.14) {
-    let y = clampI(startY, 1, GRID_H - 2);
-    for (let x = 0; x < GRID_W; x++) {
-      setRoad(x, y, roadType, 'h');
-      if (roadType !== HIGHWAY && x > 2 && x < GRID_W - 3 && Math.random() < turnChance) {
-        const nextY = clampI(y + (Math.random() < 0.5 ? -1 : 1), 1, GRID_H - 2);
-        if (nextY !== y) {
-          setRoad(x, nextY, roadType, 'v');
-          y = nextY;
-          setRoad(x, y, roadType, 'h');
-        }
-      }
-    }
-  }
-
-  function carveVertical(startX, roadType, turnChance = 0.14) {
-    let x = clampI(startX, 1, GRID_W - 2);
-    for (let y = 0; y < GRID_H; y++) {
-      setRoad(x, y, roadType, 'v');
-      if (roadType !== HIGHWAY && y > 2 && y < GRID_H - 3 && Math.random() < turnChance) {
-        const nextX = clampI(x + (Math.random() < 0.5 ? -1 : 1), 1, GRID_W - 2);
-        if (nextX !== x) {
-          setRoad(nextX, y, roadType, 'h');
-          x = nextX;
-          setRoad(x, y, roadType, 'v');
-        }
-      }
-    }
-  }
-
-  function carveClosedHighwayLoop(left, top, right, bottom, wobble = 0) {
-    const lx = clampI(left, 1, GRID_W - 2);
-    const rx = clampI(right, lx + 2, GRID_W - 1);
-    const ty = clampI(top, 1, GRID_H - 2);
-    const by = clampI(bottom, ty + 2, GRID_H - 1);
-    const topPath = [];
-    const rightPath = [];
-    const bottomPath = [];
-    const leftPath = [];
-
-    const pushTile = (x, y, dir) => {
-      if (!inBounds(x, y)) return;
-      cityMask[y][x] = true;
-      setRoad(x, y, HIGHWAY, dir);
-    };
-
-    const stitch = (ax, ay, bx, by) => {
-      let x = ax;
-      let y = ay;
-      pushTile(x, y, 'h');
-      while (x !== bx) {
-        x += Math.sign(bx - x);
-        pushTile(x, y, 'h');
-      }
-      while (y !== by) {
-        y += Math.sign(by - y);
-        pushTile(x, y, 'v');
-      }
-    };
-
-    for (let x = lx; x <= rx; x++) {
-      const y = clampI(ty + Math.round(Math.sin((x - lx) / Math.max(1, rx - lx) * Math.PI) * wobble), 1, GRID_H - 2);
-      topPath.push([x, y]);
-    }
-    for (let y = ty; y <= by; y++) {
-      const x = clampI(rx + Math.round(Math.sin((y - ty) / Math.max(1, by - ty) * Math.PI) * wobble), 1, GRID_W - 2);
-      rightPath.push([x, y]);
-    }
-    for (let x = rx; x >= lx; x--) {
-      const y = clampI(by - Math.round(Math.sin((rx - x) / Math.max(1, rx - lx) * Math.PI) * wobble), 1, GRID_H - 2);
-      bottomPath.push([x, y]);
-    }
-    for (let y = by; y >= ty; y--) {
-      const x = clampI(lx - Math.round(Math.sin((by - y) / Math.max(1, by - ty) * Math.PI) * wobble), 1, GRID_W - 2);
-      leftPath.push([x, y]);
-    }
-
-    const loop = topPath
-      .concat(rightPath.slice(1))
-      .concat(bottomPath.slice(1))
-      .concat(leftPath.slice(1));
-
-    for (let i = 1; i < loop.length; i++) {
-      stitch(loop[i - 1][0], loop[i - 1][1], loop[i][0], loop[i][1]);
-    }
-    if (loop.length > 1) {
-      stitch(loop[loop.length - 1][0], loop[loop.length - 1][1], loop[0][0], loop[0][1]);
-    }
-  }
-
-  // Closed highway loops: no dead-end highway tiles.
-  const outerLeft = clampI(Math.floor(GRID_W * 0.12), 2, GRID_W - 8);
-  const outerRight = clampI(Math.floor(GRID_W * 0.88), outerLeft + 8, GRID_W - 3);
-  const outerTop = clampI(Math.floor(GRID_H * 0.16), 2, GRID_H - 8);
-  const outerBottom = clampI(Math.floor(GRID_H * 0.84), outerTop + 8, GRID_H - 3);
-
-  const innerLeft = clampI(Math.floor(GRID_W * 0.30), 4, GRID_W - 10);
-  const innerRight = clampI(Math.floor(GRID_W * 0.70), innerLeft + 8, GRID_W - 4);
-  const innerTop = clampI(Math.floor(GRID_H * 0.34), 4, GRID_H - 10);
-  const innerBottom = clampI(Math.floor(GRID_H * 0.66), innerTop + 8, GRID_H - 4);
-
-  carveClosedHighwayLoop(outerLeft, outerTop, outerRight, outerBottom, 1);
-  carveClosedHighwayLoop(innerLeft, innerTop, innerRight, innerBottom, 1);
-
-  // Main roads cross the loops and form the city's internal structure.
-  const hMain = uniqueStarts(2, 5, 7, GRID_H).filter(y => y !== outerTop && y !== outerBottom && y !== innerTop && y !== innerBottom);
-  const vMain = uniqueStarts(3, 6, 9, GRID_W).filter(x => x !== outerLeft && x !== outerRight && x !== innerLeft && x !== innerRight);
-  for (const y of hMain) carveHorizontal(y, MAIN, 0.13);
-  for (const x of vMain) carveVertical(x, MAIN, 0.13);
-
-  // Local streets branch off main roads and then off other local streets.
-  function carveLocalBranch(seedX, seedY, maxLen) {
-    let x = seedX;
-    let y = seedY;
-    let horizontal = Math.random() < 0.5;
-    for (let k = 0; k < maxLen; k++) {
-      x += horizontal ? (Math.random() < 0.5 ? -1 : 1) : 0;
-      y += horizontal ? 0 : (Math.random() < 0.5 ? -1 : 1);
-      if (!inBounds(x, y) || !inCity(x, y)) break;
-      if (grid[y][x] !== EMPTY) break;
-      setRoad(x, y, LOCAL, horizontal ? 'h' : 'v');
-      if (Math.random() < 0.18) horizontal = !horizontal;
-    }
-  }
-
-  const mainSeeds = [];
-  const localSeeds = [];
-  for (let y = 1; y < GRID_H - 1; y++) {
-    for (let x = 1; x < GRID_W - 1; x++) {
-      if (grid[y][x] === MAIN) mainSeeds.push({x, y});
-      if (grid[y][x] === LOCAL) localSeeds.push({x, y});
-    }
-  }
-
-  const localBranchesFromMain = Math.floor((GRID_W * GRID_H) * 0.075);
-  for (let i = 0; i < localBranchesFromMain; i++) {
-    const seed = mainSeeds[Math.random() * mainSeeds.length | 0];
-    if (!seed) continue;
-    carveLocalBranch(seed.x, seed.y, 3 + (Math.random() * 6 | 0));
-  }
-
-  const localBranchesFromLocal = Math.floor((GRID_W * GRID_H) * 0.045);
-  for (let i = 0; i < localBranchesFromLocal; i++) {
-    const seed = localSeeds[Math.random() * localSeeds.length | 0];
-    if (!seed) continue;
-    carveLocalBranch(seed.x, seed.y, 2 + (Math.random() * 4 | 0));
-  }
-
   function roadClassAt(x, y) {
     const t = grid[y][x];
     if (t === HIGHWAY || t === MAIN || t === LOCAL) return t;
@@ -500,12 +532,539 @@ function buildCity() {
     return null;
   }
 
+  function inRoadBounds(x, y) {
+    return inBounds(x, y) && inCity(x, y);
+  }
+
+  function tooCloseToRoad(x, y, spacing, prevX, prevY, allowClasses = null) {
+    for (let oy = -spacing; oy <= spacing; oy++) {
+      for (let ox = -spacing; ox <= spacing; ox++) {
+        if (ox === 0 && oy === 0) continue;
+        const nx = x + ox;
+        const ny = y + oy;
+        if (!inBounds(nx, ny)) continue;
+        if (nx === prevX && ny === prevY) continue;
+        if (grid[ny][nx] === EMPTY) continue;
+        if (allowClasses) {
+          const cls = roadClassAt(nx, ny);
+          if (allowClasses.has(cls)) continue;
+        }
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function localTouchesHighway(x, y) {
+    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+    for (const d of dirs) {
+      const nx = x + d[0];
+      const ny = y + d[1];
+      if (!inBounds(nx, ny)) continue;
+      if (roadClassAt(nx, ny) === HIGHWAY) return true;
+    }
+    return false;
+  }
+
+  function classDensityScore(x, y, klass) {
+    let n = 0;
+    for (let oy = -1; oy <= 1; oy++) {
+      for (let ox = -1; ox <= 1; ox++) {
+        if (ox === 0 && oy === 0) continue;
+        const nx = x + ox;
+        const ny = y + oy;
+        if (!inBounds(nx, ny) || !inCity(nx, ny)) continue;
+        const cls = roadClassAt(nx, ny);
+        if (cls === klass) n++;
+      }
+    }
+    return n;
+  }
+
+  function violatesParallelRule(x, y, dir, klass) {
+    if (dir === 'h') {
+      const upper = (inBounds(x, y - 1) && roadClassAt(x, y - 1) === klass) ||
+                    (inBounds(x - 1, y - 1) && roadClassAt(x - 1, y - 1) === klass) ||
+                    (inBounds(x + 1, y - 1) && roadClassAt(x + 1, y - 1) === klass);
+      const lower = (inBounds(x, y + 1) && roadClassAt(x, y + 1) === klass) ||
+                    (inBounds(x - 1, y + 1) && roadClassAt(x - 1, y + 1) === klass) ||
+                    (inBounds(x + 1, y + 1) && roadClassAt(x + 1, y + 1) === klass);
+      return upper && lower;
+    }
+
+    const left = (inBounds(x - 1, y) && roadClassAt(x - 1, y) === klass) ||
+                 (inBounds(x - 1, y - 1) && roadClassAt(x - 1, y - 1) === klass) ||
+                 (inBounds(x - 1, y + 1) && roadClassAt(x - 1, y + 1) === klass);
+    const right = (inBounds(x + 1, y) && roadClassAt(x + 1, y) === klass) ||
+                  (inBounds(x + 1, y - 1) && roadClassAt(x + 1, y - 1) === klass) ||
+                  (inBounds(x + 1, y + 1) && roadClassAt(x + 1, y + 1) === klass);
+    return left && right;
+  }
+
+  function perpendicular(dx, dy) {
+    if (dx !== 0) return { dx: 0, dy: Math.random() < 0.5 ? -1 : 1 };
+    return { dx: Math.random() < 0.5 ? -1 : 1, dy: 0 };
+  }
+
+  function randomEdgeSeed() {
+    const e = Math.random() * 4 | 0;
+    const pad = 4;
+    if (e === 0) return { x: clampI(pad + Math.random() * (GRID_W - pad * 2 - 1), pad, GRID_W - pad - 1), y: 0, dx: 0, dy: 1 };
+    if (e === 1) return { x: GRID_W - 1, y: clampI(pad + Math.random() * (GRID_H - pad * 2 - 1), pad, GRID_H - pad - 1), dx: -1, dy: 0 };
+    if (e === 2) return { x: clampI(pad + Math.random() * (GRID_W - pad * 2 - 1), pad, GRID_W - pad - 1), y: GRID_H - 1, dx: 0, dy: -1 };
+    return { x: 0, y: clampI(pad + Math.random() * (GRID_H - pad * 2 - 1), pad, GRID_H - pad - 1), dx: 1, dy: 0 };
+  }
+
+  function adjacentCountByClass(x, y, klass) {
+    let n = 0;
+    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+    for (const d of dirs) {
+      const nx = x + d[0];
+      const ny = y + d[1];
+      if (!inBounds(nx, ny) || !inCity(nx, ny)) continue;
+      if (roadClassAt(nx, ny) === klass) n++;
+    }
+    return n;
+  }
+
+  function downgradeUnhelpfulHighways() {
+    const seen = create2D(GRID_H, GRID_W, false);
+    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+
+    // 1) Downgrade entire highway components that do not connect well to the city.
+    for (let y = 0; y < GRID_H; y++) {
+      for (let x = 0; x < GRID_W; x++) {
+        if (seen[y][x] || grid[y][x] !== HIGHWAY) continue;
+
+        const q = [{x, y}];
+        seen[y][x] = true;
+        const comp = [];
+        let mainTouches = 0;
+
+        while (q.length) {
+          const cur = q.pop();
+          comp.push(cur);
+          mainTouches += adjacentCountByClass(cur.x, cur.y, MAIN);
+
+          for (const d of dirs) {
+            const nx = cur.x + d[0];
+            const ny = cur.y + d[1];
+            if (!inBounds(nx, ny) || !inCity(nx, ny)) continue;
+            if (seen[ny][nx] || grid[ny][nx] !== HIGHWAY) continue;
+            seen[ny][nx] = true;
+            q.push({x: nx, y: ny});
+          }
+        }
+
+        if (comp.length < 30 || mainTouches < 2) {
+          for (const c of comp) {
+            grid[c.y][c.x] = MAIN;
+            if (dirGrid[c.y][c.x] === 'b') dirGrid[c.y][c.x] = 'h';
+            if (interMask[c.y][c.x] & CLASS_BIT[HIGHWAY]) {
+              interMask[c.y][c.x] &= ~CLASS_BIT[HIGHWAY];
+            }
+          }
+        }
+      }
+    }
+
+    // 2) Trim highway dead tails that have no main-road purpose.
+    let changed = true;
+    let passes = 0;
+    while (changed && passes < 6) {
+      changed = false;
+      passes++;
+      for (let y = 1; y < GRID_H - 1; y++) {
+        for (let x = 1; x < GRID_W - 1; x++) {
+          if (grid[y][x] !== HIGHWAY) continue;
+          const hN = adjacentCountByClass(x, y, HIGHWAY);
+          const mN = adjacentCountByClass(x, y, MAIN);
+          if (mN === 0 && hN <= 1) {
+            grid[y][x] = MAIN;
+            if (dirGrid[y][x] === 'b') dirGrid[y][x] = 'h';
+            changed = true;
+          }
+        }
+      }
+    }
+  }
+
+  function stepGrow(seed, roadType, cfg) {
+    const path = [];
+    let x = seed.x;
+    let y = seed.y;
+    let dx = seed.dx;
+    let dy = seed.dy;
+
+    const canUse = (tx, ty) => roadType === LOCAL ? inRoadBounds(tx, ty) : inBounds(tx, ty);
+
+    if (!canUse(x, y) || grid[y][x] !== EMPTY) return path;
+    if (roadType === LOCAL && localTouchesHighway(x, y)) return path;
+
+    cityMask[y][x] = true;
+    setRoad(x, y, roadType, dx !== 0 ? 'h' : 'v');
+    path.push({ x, y, dx, dy });
+
+    for (let i = 0; i < cfg.maxLen; i++) {
+      if (Math.random() < cfg.stopChance) break;
+
+      let ndx = dx;
+      let ndy = dy;
+      const r = Math.random();
+      if (r > cfg.straightChance) {
+        const p = perpendicular(dx, dy);
+        ndx = p.dx;
+        ndy = p.dy;
+      }
+
+      const nx = x + ndx;
+      const ny = y + ndy;
+      if (!canUse(nx, ny)) break;
+
+      const cls = roadClassAt(nx, ny);
+      if (grid[ny][nx] !== EMPTY) {
+        if (roadType === HIGHWAY && cls === HIGHWAY) break;
+        if (roadType === MAIN && cls === HIGHWAY) break;
+        if (roadType === LOCAL && (cls === HIGHWAY || cls === MAIN)) break;
+        if (roadType === LOCAL && cls === LOCAL && Math.random() < cfg.loopChance) {
+          // Allow occasional local-local joins to form neighborhood loops.
+          setRoad(nx, ny, LOCAL, ndx !== 0 ? 'h' : 'v');
+          path.push({ x: nx, y: ny, dx: ndx, dy: ndy });
+        }
+        break;
+      }
+
+      const allowNear = new Set();
+      if (roadType === MAIN) allowNear.add(HIGHWAY);
+      if (roadType === LOCAL) {
+        allowNear.add(MAIN);
+      }
+      if (tooCloseToRoad(nx, ny, cfg.spacing, x, y, allowNear)) break;
+      if (roadType === LOCAL && localTouchesHighway(nx, ny)) break;
+      if (roadType === MAIN) {
+        if (violatesParallelRule(nx, ny, ndx !== 0 ? 'h' : 'v', MAIN)) break;
+        if (classDensityScore(nx, ny, MAIN) >= 5) break;
+      }
+      if (roadType === LOCAL) {
+        if (violatesParallelRule(nx, ny, ndx !== 0 ? 'h' : 'v', LOCAL)) break;
+        if (classDensityScore(nx, ny, LOCAL) >= 6) break;
+      }
+
+      cityMask[ny][nx] = true;
+      setRoad(nx, ny, roadType, ndx !== 0 ? 'h' : 'v');
+      path.push({ x: nx, y: ny, dx: ndx, dy: ndy });
+      x = nx;
+      y = ny;
+      dx = ndx;
+      dy = ndy;
+
+      if (x === 0 || y === 0 || x === GRID_W - 1 || y === GRID_H - 1) break;
+    }
+
+    return path;
+  }
+
+  buildCityMask();
+  if (onProgress) onProgress(10, 'Mask', 'Boundary mask built');
+  await new Promise(requestAnimationFrame);
+
+  const highways = [];
+  const mainTiles = [];
+  const localTiles = [];
+  const mapArea = GRID_W * GRID_H;
+  const mapScale = Math.sqrt(mapArea / (64 * 46));
+
+  // 1) Highways from edge seeds, grown step-by-step.
+  const highwaySeedCount = clampI(tuning.highwaySeeds, 2, 10);
+  const minHighwayLen = Math.floor(Math.max(GRID_W, GRID_H) * tuning.highwayMinLenRatio);
+  const highwayCfg = {
+    straightChance: 0.95,
+    stopChance: 0.00,
+    maxLen: Math.floor(Math.max(GRID_W, GRID_H) * tuning.highwayMaxLenMult),
+    spacing: 0,
+    loopChance: 0.0,
+  };
+
+  for (let i = 0; i < highwaySeedCount; i++) {
+    let best = [];
+    for (let tries = 0; tries < 18; tries++) {
+      const raw = randomEdgeSeed();
+      const seed = {
+        x: clampI(raw.x + raw.dx * 2, 1, GRID_W - 2),
+        y: clampI(raw.y + raw.dy * 2, 1, GRID_H - 2),
+        dx: raw.dx,
+        dy: raw.dy,
+      };
+      const path = stepGrow(seed, HIGHWAY, highwayCfg);
+      if (path.length > best.length) best = path;
+      if (best.length >= minHighwayLen) break;
+    }
+    if (best.length >= 20) highways.push(best);
+    if (onProgress) onProgress(15 + Math.floor((i + 1) / highwaySeedCount * 25), 'Highways', `Seeds ${i + 1}/${highwaySeedCount}`);
+  }
+
+  function highwayAnchor(path) {
+    if (!path || path.length === 0) return null;
+    return path[path.length >> 1];
+  }
+
+  function stitchHighways(a, b) {
+    if (!a || !b) return;
+    let x = a.x;
+    let y = a.y;
+    let horizontalFirst = Math.abs(b.x - a.x) >= Math.abs(b.y - a.y);
+
+    const push = (nx, ny, dir) => {
+      if (!inBounds(nx, ny)) return false;
+      cityMask[ny][nx] = true;
+      setRoad(nx, ny, HIGHWAY, dir);
+      return true;
+    };
+
+    push(x, y, horizontalFirst ? 'h' : 'v');
+
+    while (x !== b.x || y !== b.y) {
+      if (horizontalFirst && x !== b.x) {
+        x += Math.sign(b.x - x);
+        push(x, y, 'h');
+      } else if (!horizontalFirst && y !== b.y) {
+        y += Math.sign(b.y - y);
+        push(x, y, 'v');
+      } else {
+        horizontalFirst = !horizontalFirst;
+      }
+
+      // Slight jogs keep connectors from feeling too geometric.
+      if (Math.random() < 0.03) {
+        if (horizontalFirst && y !== b.y) {
+          y += Math.sign(b.y - y);
+          push(x, y, 'v');
+        } else if (!horizontalFirst && x !== b.x) {
+          x += Math.sign(b.x - x);
+          push(x, y, 'h');
+        }
+      }
+    }
+  }
+
+  // Connect isolated highways into one connected backbone.
+  if (highways.length > 1) {
+    for (let i = 1; i < highways.length; i++) {
+      const a = highwayAnchor(highways[i - 1]);
+      const b = highwayAnchor(highways[i]);
+      stitchHighways(a, b);
+    }
+  }
+
+  if (onProgress) onProgress(42, 'Highways', `Connected trunks: ${highways.length}`);
+  await new Promise(requestAnimationFrame);
+
+  // 2) Main roads from highway points, grown step-by-step.
+  const mainCfg = {
+    straightChance: 0.70,
+    stopChance: 0.00,
+    maxLen: 24 + (Math.random() * 24 | 0),
+    spacing: 0,
+    loopChance: 0.0,
+  };
+  const maxMainRoads = Math.floor(tuning.mainBranchCap);
+  const targetMainRoads = Math.max(maxMainRoads, Math.floor(highways.reduce((s, h) => s + h.length, 0) * tuning.mainFromHighwayFactor));
+  let mainCount = 0;
+
+  for (const h of highways) {
+    let idx = 6;
+    while (idx < h.length - 6 && mainCount < targetMainRoads) {
+      idx += 4 + (Math.random() * 6 | 0);
+      if (idx >= h.length - 2) break;
+      if (Math.random() < Math.max(0.06, tuning.mainSkipChance - mapScale * 0.03)) continue;
+
+      const p = h[idx];
+      const d = perpendicular(p.dx, p.dy);
+      const seed = { x: p.x + d.dx, y: p.y + d.dy, dx: d.dx, dy: d.dy };
+      if (!inRoadBounds(seed.x, seed.y) || grid[seed.y][seed.x] !== EMPTY) continue;
+      const path = stepGrow(seed, MAIN, mainCfg);
+      if (path.length >= 8) {
+        mainCount++;
+        for (const t of path) mainTiles.push(t);
+      }
+    }
+  }
+
+  downgradeUnhelpfulHighways();
+  if (onProgress) onProgress(60, 'Main Roads', `Main branches: ${mainCount}`);
+  await new Promise(requestAnimationFrame);
+
+  // 3) Local roads from main roads, short and high-randomness growth.
+  const localCfg = {
+    straightChance: 0.40,
+    stopChance: 0.20,
+    maxLen: 7 + (Math.random() * 12 | 0),
+    spacing: 1,
+    loopChance: 0.30,
+  };
+  const maxLocalRoads = Math.max(Math.floor(tuning.localBaseCap), Math.floor(mapArea * tuning.localAreaFactor + mainTiles.length * tuning.localFromMainFactor));
+  let localCount = 0;
+
+  for (let i = 0; i < mainTiles.length && localCount < maxLocalRoads; i += 1 + (Math.random() * 2 | 0)) {
+    if (Math.random() < Math.max(0.07, 0.35 - mapScale * 0.09)) continue;
+    const m = mainTiles[i];
+    const d = perpendicular(m.dx, m.dy);
+    const seed = { x: m.x + d.dx, y: m.y + d.dy, dx: d.dx, dy: d.dy };
+    if (!inRoadBounds(seed.x, seed.y) || grid[seed.y][seed.x] !== EMPTY) continue;
+    const path = stepGrow(seed, LOCAL, localCfg);
+    if (path.length >= 2) {
+      localCount++;
+      for (const t of path) localTiles.push(t);
+    }
+  }
+
+  // Secondary local growth: branch from existing local roads so neighborhoods
+  // connect internally instead of only hanging off main roads.
+  const localBranchCfg = {
+    straightChance: 0.52,
+    stopChance: 0.12,
+    maxLen: 6 + (Math.random() * 10 | 0),
+    spacing: 1,
+    loopChance: 0.55,
+  };
+  const localBranchCap = maxLocalRoads + Math.floor(maxLocalRoads * tuning.localBranchExtra);
+  for (let i = 0; i < localTiles.length && localCount < localBranchCap; i += 1 + (Math.random() * 3 | 0)) {
+    if (Math.random() < Math.max(0.18, 0.42 - mapScale * 0.07)) continue;
+    const l = localTiles[i];
+    const d = perpendicular(l.dx, l.dy);
+    const seed = { x: l.x + d.dx, y: l.y + d.dy, dx: d.dx, dy: d.dy };
+    if (!inRoadBounds(seed.x, seed.y) || grid[seed.y][seed.x] !== EMPTY) continue;
+    const path = stepGrow(seed, LOCAL, localBranchCfg);
+    if (path.length >= 2) {
+      localCount++;
+      for (const t of path) localTiles.push(t);
+    }
+  }
+  if (onProgress) onProgress(82, 'Local Roads', `Local branches: ${localCount}`);
+  await new Promise(requestAnimationFrame);
+
+  // Occasional short local loops.
+  for (let i = 0; i < localTiles.length; i += 6) {
+    if (Math.random() >= tuning.localLoopChance) continue;
+    const a = localTiles[i];
+    const candidates = [[2,0],[-2,0],[0,2],[0,-2]];
+    for (const c of candidates) {
+      const tx = a.x + c[0];
+      const ty = a.y + c[1];
+      if (!inRoadBounds(tx, ty) || roadClassAt(tx, ty) !== LOCAL) continue;
+      const mx = a.x + Math.sign(c[0]);
+      const my = a.y + Math.sign(c[1]);
+      if (!inRoadBounds(mx, my) || grid[my][mx] !== EMPTY) continue;
+      if (localTouchesHighway(mx, my)) continue;
+      if (tooCloseToRoad(mx, my, 1, a.x, a.y, new Set([MAIN]))) continue;
+      if (violatesParallelRule(mx, my, mx !== a.x ? 'h' : 'v', LOCAL)) continue;
+      setRoad(mx, my, LOCAL, mx !== a.x ? 'h' : 'v');
+      break;
+    }
+  }
+  if (onProgress) onProgress(88, 'Local Loops', `Loop candidates: ${localTiles.length}`);
+
   function orientFromPair(a, b) {
     const sameX = a.x === b.x;
     const sameY = a.y === b.y;
     if (sameY) return 'h';
     if (sameX) return 'v';
     return null;
+  }
+
+  function roadNeighbors(x, y) {
+    const out = [];
+    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+    for (const d of dirs) {
+      const nx = x + d[0];
+      const ny = y + d[1];
+      if (!inCity(nx, ny)) continue;
+      if (grid[ny][nx] === EMPTY) continue;
+      out.push({x: nx, y: ny});
+    }
+    return out;
+  }
+
+  function pruneEdgeRoads() {
+    const edgeX = Math.max(3, Math.floor(GRID_W * 0.08));
+    const edgeY = Math.max(3, Math.floor(GRID_H * 0.08));
+
+    for (let y = 0; y < GRID_H; y++) {
+      for (let x = 0; x < GRID_W; x++) {
+        const t = grid[y][x];
+        if (t === EMPTY || t === HIGHWAY) continue;
+        const nearX = Math.min(x, GRID_W - 1 - x);
+        const nearY = Math.min(y, GRID_H - 1 - y);
+        const edgeFactor = Math.min(nearX / edgeX, nearY / edgeY);
+        if (edgeFactor >= 1) continue;
+
+        const cls = roadClassAt(x, y) || t;
+        const base = cls === LOCAL ? tuning.edgePruneLocal : tuning.edgePruneMain;
+        const dropChance = base * (1 - edgeFactor);
+        if (Math.random() < dropChance) {
+          grid[y][x] = EMPTY;
+          dirGrid[y][x] = null;
+          interMask[y][x] = 0;
+        }
+      }
+    }
+  }
+
+  function keepMajorityNetwork() {
+    const seen = create2D(GRID_H, GRID_W, false);
+    const comps = [];
+
+    for (let y = 0; y < GRID_H; y++) {
+      for (let x = 0; x < GRID_W; x++) {
+        if (seen[y][x] || grid[y][x] === EMPTY || !inCity(x, y)) continue;
+        const q = [{x, y}];
+        const comp = [];
+        seen[y][x] = true;
+        while (q.length) {
+          const cur = q.pop();
+          comp.push(cur);
+          for (const n of roadNeighbors(cur.x, cur.y)) {
+            if (seen[n.y][n.x]) continue;
+            seen[n.y][n.x] = true;
+            q.push(n);
+          }
+        }
+        comps.push(comp);
+      }
+    }
+
+    if (comps.length <= 1) return;
+    comps.sort((a, b) => b.length - a.length);
+    const keep = new Set(comps[0].map(c => c.x + ',' + c.y));
+
+    for (let i = 1; i < comps.length; i++) {
+      for (const c of comps[i]) {
+        if (keep.has(c.x + ',' + c.y)) continue;
+        grid[c.y][c.x] = EMPTY;
+        dirGrid[c.y][c.x] = null;
+        interMask[c.y][c.x] = 0;
+      }
+    }
+
+    // Trim hanging single-tile stubs left after component pruning.
+    let changed = true;
+    let pass = 0;
+    while (changed && pass < 4) {
+      changed = false;
+      pass++;
+      for (let y = 1; y < GRID_H - 1; y++) {
+        for (let x = 1; x < GRID_W - 1; x++) {
+          if (grid[y][x] === EMPTY) continue;
+          if (roadClassAt(x, y) === HIGHWAY) continue;
+          if (roadNeighbors(x, y).length <= 1) {
+            grid[y][x] = EMPTY;
+            dirGrid[y][x] = null;
+            interMask[y][x] = 0;
+            changed = true;
+          }
+        }
+      }
+    }
   }
 
   // Smart intersection cleanup: keep true junctions, downgrade fake/degenerate ones.
@@ -557,6 +1116,30 @@ function buildCity() {
     }
   }
 
+  // Edge sparseness + majority-network enforcement.
+  pruneEdgeRoads();
+  keepMajorityNetwork();
+
+  // Re-normalize intersections after pruning passes.
+  for (let y = 0; y < GRID_H; y++) {
+    for (let x = 0; x < GRID_W; x++) {
+      if (grid[y][x] !== INTER) continue;
+      const nbrs = roadNeighbors(x, y);
+      if (nbrs.length <= 1) {
+        if (nbrs.length === 0) {
+          grid[y][x] = EMPTY;
+          dirGrid[y][x] = null;
+          interMask[y][x] = 0;
+        } else {
+          const cls = roadClassAt(nbrs[0].x, nbrs[0].y) || LOCAL;
+          grid[y][x] = cls;
+          dirGrid[y][x] = (nbrs[0].x === x) ? 'v' : 'h';
+          interMask[y][x] = 0;
+        }
+      }
+    }
+  }
+
   for (let y = 0; y < GRID_H; y++) {
     for (let x = 0; x < GRID_W; x++) {
       if (grid[y][x] === INTER && interMask[y][x] === 0) {
@@ -564,6 +1147,7 @@ function buildCity() {
       }
     }
   }
+  if (onProgress) onProgress(100, 'Done', `Highways: ${highways.length}\nMain: ${mainCount}\nLocal: ${localCount}`);
 }
 
 function tileClass(x, y) {
@@ -890,6 +1474,25 @@ function simStep() {
 }
 
 function generateBuildings() {
+  const builtMask = create2D(GRID_H, GRID_W, false);
+
+  let localRoadCount = 0;
+  let mainRoadCount = 0;
+  for (let y = 0; y < GRID_H; y++) {
+    for (let x = 0; x < GRID_W; x++) {
+      const t = grid[y][x];
+      if (t === LOCAL) localRoadCount++;
+      if (t === MAIN) mainRoadCount++;
+      if (t === INTER) {
+        const m = interMask[y][x] || 0;
+        if (m & CLASS_BIT[LOCAL]) localRoadCount++;
+        else if (m & CLASS_BIT[MAIN]) mainRoadCount++;
+      }
+    }
+  }
+
+  const localRoadWeight = localRoadCount / Math.max(1, (localRoadCount + mainRoadCount));
+
   function hasResidentialFrontage(x, y) {
     const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
     for (const d of dirs) {
@@ -934,10 +1537,65 @@ function generateBuildings() {
     const dx = (x - cx) / (GRID_W / 2);
     const dy = (y - cy) / (GRID_H / 2);
     const dist = Math.min(1, Math.sqrt(dx * dx + dy * dy));
-    const coreBias = 0.64 + (1 - dist) * 0.20;
+    const coreBias = 0.72 + (1 - dist) * 0.22;
     const frontage = frontageType(x, y);
-    const frontageBias = frontage === LOCAL ? 0.34 : frontage === MAIN ? 0.02 : 0.0;
-    return Math.min(0.98, coreBias + frontageBias);
+    if (frontage == null) return 0;
+
+    // Main-frontage parcels stay lighter; local-frontage neighborhoods stay denser.
+    if (frontage === MAIN) {
+      const mainBase = 0.03 + (1 - dist) * 0.06;
+      return Math.min(tuning.mainFrontageCap, mainBase + (1 - localRoadWeight) * 0.03);
+    }
+
+    const frontageBias = frontage === LOCAL ? tuning.localFrontageBias + localRoadWeight * 0.18 : 0.0;
+
+    let nearLocal = 0;
+    for (let oy = -2; oy <= 2; oy++) {
+      for (let ox = -2; ox <= 2; ox++) {
+        if (ox === 0 && oy === 0) continue;
+        const nx = x + ox;
+        const ny = y + oy;
+        if (!inCity(nx, ny)) continue;
+        const t = grid[ny][nx];
+        if (t === LOCAL) nearLocal++;
+        if (t === INTER && (interMask[ny][nx] & CLASS_BIT[LOCAL])) nearLocal++;
+      }
+    }
+
+    const livingZoneBias = Math.min(tuning.nearLocalBiasCap, nearLocal * 0.022);
+    const baseChance = Math.min(0.995, coreBias + frontageBias);
+    const boostedChance = 1 - Math.pow(1 - Math.min(0.995, baseChance + livingZoneBias), tuning.houseSpawnMult);
+    return Math.min(0.999, boostedChance);
+  }
+
+  function makeBuildingAt(x, y) {
+    const px = x * CELL;
+    const py = y * CELL;
+    const blocks = [];
+    const count = 1 + (Math.random() * 2 | 0);
+    for (let i = 0; i < count; i++) {
+      const m = 4;
+      const bw = 6 + (Math.random() * (CELL - 2 * m - 7) | 0);
+      const bh = 6 + (Math.random() * (CELL - 2 * m - 7) | 0);
+      const bx = m + (Math.random() * Math.max(1, CELL - 2 * m - bw) | 0);
+      const by = m + (Math.random() * Math.max(1, CELL - 2 * m - bh) | 0);
+      blocks.push({bx, by, bw, bh, dark: Math.random() < 0.5, round: 1 + (Math.random() * 3 | 0)});
+    }
+    buildingCache.push({px, py, blocks, toneDark: Math.random() < 0.5, pad: 2 + (Math.random() * 2 | 0)});
+    builtMask[y][x] = true;
+  }
+
+  function nearBuiltLot(x, y, r = 2) {
+    for (let oy = -r; oy <= r; oy++) {
+      for (let ox = -r; ox <= r; ox++) {
+        if (ox === 0 && oy === 0) continue;
+        const nx = x + ox;
+        const ny = y + oy;
+        if (!inBounds(nx, ny)) continue;
+        if (builtMask[ny][nx]) return true;
+      }
+    }
+    return false;
   }
 
   buildingCache = [];
@@ -950,20 +1608,18 @@ function generateBuildings() {
       // Density is heavier near the city core and along main streets.
       // Edge lots and local-frontage parcels stay more open.
       if (Math.random() > lotFillChance(x, y)) continue;
+      makeBuildingAt(x, y);
+    }
+  }
 
-      const px = x * CELL;
-      const py = y * CELL;
-      const blocks = [];
-      const count = 1 + (Math.random() * 2 | 0);
-      for (let i = 0; i < count; i++) {
-        const m = 4;
-        const bw = 6 + (Math.random() * (CELL - 2 * m - 7) | 0);
-        const bh = 6 + (Math.random() * (CELL - 2 * m - 7) | 0);
-        const bx = m + (Math.random() * Math.max(1, CELL - 2 * m - bw) | 0);
-        const by = m + (Math.random() * Math.max(1, CELL - 2 * m - bh) | 0);
-        blocks.push({bx, by, bw, bh, dark: Math.random() < 0.5, round: 1 + (Math.random() * 3 | 0)});
-      }
-      buildingCache.push({px, py, blocks, toneDark: Math.random() < 0.5, pad: 2 + (Math.random() * 2 | 0)});
+  // Infill pass: reduce empty gaps inside active local neighborhoods.
+  for (let y = 0; y < GRID_H; y++) {
+    for (let x = 0; x < GRID_W; x++) {
+      if (builtMask[y][x]) continue;
+      if (!inCity(x, y) || grid[y][x] !== EMPTY) continue;
+      if (frontageType(x, y) !== LOCAL) continue;
+      if (!nearBuiltLot(x, y, 2)) continue;
+      if (Math.random() < tuning.infillChance) makeBuildingAt(x, y);
     }
   }
 }
@@ -1287,15 +1943,111 @@ document.getElementById('btn-zin').onclick = () => zoomAt(canvas.width * 0.5, ca
 document.getElementById('btn-zout').onclick = () => zoomAt(canvas.width * 0.5, canvas.height * 0.5, 0.89);
 document.getElementById('btn-zreset').onclick = () => resetView();
 
-buildCity();
-generateBuildings();
-simReset();
-for (let i = 0; i < 20; i++) spawnCar();
-resizeCanvas();
-requestAnimationFrame((ts) => {
-  lastTime = ts;
-  requestAnimationFrame(loop);
-});
+const tuneFields = [
+  { key: 'highwaySeeds', input: 't-highway-seeds', value: 'v-highway-seeds', fmt: (v) => String(Math.round(v)), int: true },
+  { key: 'highwayMinLenRatio', input: 't-highway-minlen', value: 'v-highway-minlen', fmt: (v) => Number(v).toFixed(2) },
+  { key: 'highwayMaxLenMult', input: 't-highway-maxlen', value: 'v-highway-maxlen', fmt: (v) => Number(v).toFixed(2) },
+  { key: 'mainBranchCap', input: 't-main-max', value: 'v-main-max', fmt: (v) => String(Math.round(v)), int: true },
+  { key: 'mainFromHighwayFactor', input: 't-main-factor', value: 'v-main-factor', fmt: (v) => Number(v).toFixed(2) },
+  { key: 'mainSkipChance', input: 't-main-skip', value: 'v-main-skip', fmt: (v) => Number(v).toFixed(2) },
+  { key: 'localBaseCap', input: 't-local-base', value: 'v-local-base', fmt: (v) => String(Math.round(v)), int: true },
+  { key: 'localAreaFactor', input: 't-local-area', value: 'v-local-area', fmt: (v) => Number(v).toFixed(3) },
+  { key: 'localFromMainFactor', input: 't-local-main', value: 'v-local-main', fmt: (v) => Number(v).toFixed(2) },
+  { key: 'localBranchExtra', input: 't-local-branch', value: 'v-local-branch', fmt: (v) => Number(v).toFixed(2) },
+  { key: 'localLoopChance', input: 't-local-loop', value: 'v-local-loop', fmt: (v) => Number(v).toFixed(2) },
+  { key: 'houseSpawnMult', input: 't-house-mult', value: 'v-house-mult', fmt: (v) => String(Math.round(v)), int: true },
+  { key: 'localFrontageBias', input: 't-local-frontage', value: 'v-local-frontage', fmt: (v) => Number(v).toFixed(2) },
+  { key: 'nearLocalBiasCap', input: 't-near-local', value: 'v-near-local', fmt: (v) => Number(v).toFixed(2) },
+  { key: 'mainFrontageCap', input: 't-main-frontage-cap', value: 'v-main-frontage-cap', fmt: (v) => Number(v).toFixed(2) },
+  { key: 'infillChance', input: 't-infill', value: 'v-infill', fmt: (v) => Number(v).toFixed(2) },
+  { key: 'edgePruneLocal', input: 't-edge-local', value: 'v-edge-local', fmt: (v) => Number(v).toFixed(2) },
+  { key: 'edgePruneMain', input: 't-edge-main', value: 'v-edge-main', fmt: (v) => Number(v).toFixed(2) },
+];
+
+function setTuningUiFromState() {
+  for (const f of tuneFields) {
+    const input = document.getElementById(f.input);
+    const valueLabel = document.getElementById(f.value);
+    if (!input || !valueLabel) continue;
+    input.value = String(tuning[f.key]);
+    valueLabel.textContent = f.fmt(tuning[f.key]);
+  }
+}
+
+function wireTuningPreview() {
+  for (const f of tuneFields) {
+    const input = document.getElementById(f.input);
+    const valueLabel = document.getElementById(f.value);
+    if (!input || !valueLabel) continue;
+    input.addEventListener('input', () => {
+      valueLabel.textContent = f.fmt(Number(input.value));
+    });
+  }
+}
+
+function applyTuningFromUi() {
+  for (const f of tuneFields) {
+    const input = document.getElementById(f.input);
+    if (!input) continue;
+    const raw = Number(input.value);
+    tuning[f.key] = f.int ? Math.round(raw) : raw;
+  }
+}
+
+const genPanel = document.getElementById('gen-progress');
+const genPhase = document.getElementById('gen-phase');
+const genFill = document.getElementById('gen-fill');
+const genMeta = document.getElementById('gen-meta');
+const btnApplyRegenerate = document.getElementById('btn-apply-regenerate');
+
+let generationInProgress = false;
+let loopStarted = false;
+
+function setGenerationProgress(pct, phase, meta = '') {
+  genPanel.style.display = 'block';
+  genPhase.textContent = phase;
+  genFill.style.width = Math.max(0, Math.min(100, pct)) + '%';
+  genMeta.textContent = meta;
+}
+
+async function initSimulation(startLoop = false) {
+  if (generationInProgress) return;
+  generationInProgress = true;
+  btnApplyRegenerate.disabled = true;
+
+  setGenerationProgress(2, 'Starting', 'Preparing generators...');
+  await buildCity(setGenerationProgress);
+  setGenerationProgress(96, 'Buildings', 'Placing lots...');
+  await new Promise(requestAnimationFrame);
+  generateBuildings();
+  simReset();
+  for (let i = 0; i < 20; i++) spawnCar();
+  resizeCanvas();
+  setGenerationProgress(100, 'Ready', 'Simulation running');
+  setTimeout(() => {
+    genPanel.style.display = 'none';
+  }, 1200);
+
+  generationInProgress = false;
+  btnApplyRegenerate.disabled = false;
+
+  if (startLoop && !loopStarted) {
+    loopStarted = true;
+    requestAnimationFrame((ts) => {
+      lastTime = ts;
+      requestAnimationFrame(loop);
+    });
+  }
+}
+
+btnApplyRegenerate.onclick = async () => {
+  applyTuningFromUi();
+  await initSimulation(false);
+};
+
+setTuningUiFromState();
+wireTuningPreview();
+initSimulation(true);
 </script>
 </body>
 </html>
