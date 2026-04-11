@@ -1,170 +1,173 @@
-from __future__ import annotations
-
-from dataclasses import dataclass
-from enum import IntEnum
-from typing import List, Optional, Tuple
+"""
+grid.py
+-------
+Defines the city grid layout using numpy.
+Each cell holds one of: EMPTY, ROAD, HIGHWAY, INTERSECTION.
+"""
 
 import numpy as np
+import random
+
+# --- Cell type constants ---
+EMPTY        = 0
+ROAD         = 1
+HIGHWAY      = 2
+INTERSECTION = 3
+
+# Human-readable names (useful for debugging)
+CELL_NAMES = {
+    EMPTY:        "empty",
+    ROAD:         "road",
+    HIGHWAY:      "highway",
+    INTERSECTION: "intersection",
+}
 
 
-Position = Tuple[int, int]
-
-
-class Tile(IntEnum):
-    EMPTY = 0
-    ROAD = 1
-    HIGHWAY = 2
-    INTERSECTION = 3
-
-
-DRIVABLE_TILES = {Tile.ROAD, Tile.HIGHWAY, Tile.INTERSECTION}
-
-
-@dataclass
 class CityGrid:
-    width: int = 32
-    height: int = 32
+    """
+    Represents the city as a 2D numpy array.
 
-    def __post_init__(self) -> None:
-        self.grid = np.full((self.height, self.width), Tile.EMPTY, dtype=np.int8)
-        self._seed_basic_layout()
+    Coordinates:  grid[row, col]  →  row = y, col = x
+    Access helper: self.get(x, y)  /  self.set(x, y, cell_type)
+    """
 
-    def _seed_basic_layout(self) -> None:
-        """Create a city-like network with ring roads, radials, and local streets."""
-        self.grid[:, :] = Tile.EMPTY
+    def __init__(self, width: int = 20, height: int = 20):
+        self.width  = width
+        self.height = height
+        # All cells start as EMPTY
+        self.grid = np.zeros((height, width), dtype=np.int8)
 
-        rng = np.random.default_rng(self.width * 1009 + self.height * 917)
-        cx, cy = self.width / 2.0, self.height / 2.0
-        rx = max(6.0, self.width * 0.38)
-        ry = max(6.0, self.height * 0.34)
+    # ------------------------------------------------------------------
+    # Basic access helpers
+    # ------------------------------------------------------------------
 
-        # Two elliptical highway rings.
-        self._draw_ring(cx, cy, rx, ry, thickness=0.12, tile=Tile.HIGHWAY)
-        self._draw_ring(cx, cy, rx * 0.68, ry * 0.66, thickness=0.11, tile=Tile.HIGHWAY)
+    def get(self, x: int, y: int) -> int:
+        """Return cell type at (x, y). Returns EMPTY for out-of-bounds."""
+        if self.in_bounds(x, y):
+            return int(self.grid[y, x])
+        return EMPTY
 
-        # Radial arterials spread outward from core.
-        radial_count = 14 if min(self.width, self.height) >= 40 else 10
-        angle_jitter = float(rng.uniform(0.0, 2.0 * np.pi))
-        for i in range(radial_count):
-            angle = angle_jitter + i * (2.0 * np.pi / radial_count) + float(rng.uniform(-0.11, 0.11))
-            self._draw_radial(cx, cy, angle, int(max(self.width, self.height) * 0.7))
+    def set(self, x: int, y: int, cell_type: int) -> None:
+        """Set cell type at (x, y) if in bounds."""
+        if self.in_bounds(x, y):
+            self.grid[y, x] = cell_type
 
-        # Dense inner grid around downtown.
-        inner_margin_x = max(4, int(self.width * 0.22))
-        inner_margin_y = max(4, int(self.height * 0.22))
-        for y in range(inner_margin_y, self.height - inner_margin_y, 3):
-            self.grid[y, inner_margin_x : self.width - inner_margin_x] = Tile.ROAD
-        for x in range(inner_margin_x, self.width - inner_margin_x, 3):
-            self.grid[inner_margin_y : self.height - inner_margin_y, x] = Tile.ROAD
-
-        # Organic neighborhood streets grown from random district seeds.
-        district_count = 22 if min(self.width, self.height) >= 48 else 14
-        for _ in range(district_count):
-            sx = int(rng.integers(2, self.width - 2))
-            sy = int(rng.integers(2, self.height - 2))
-            self._grow_local_streets((sx, sy), rng, steps=int(max(self.width, self.height) * 2.4))
-
-        self._promote_intersections()
-
-    def _draw_ring(
-        self,
-        cx: float,
-        cy: float,
-        rx: float,
-        ry: float,
-        thickness: float,
-        tile: Tile,
-    ) -> None:
-        for y in range(self.height):
-            for x in range(self.width):
-                nx = (x - cx) / max(1.0, rx)
-                ny = (y - cy) / max(1.0, ry)
-                d = np.sqrt(nx * nx + ny * ny)
-                if abs(d - 1.0) <= thickness:
-                    self.grid[y, x] = tile
-
-    def _draw_radial(self, cx: float, cy: float, angle: float, length: int) -> None:
-        for step in range(length):
-            r = step * 0.75
-            x = int(round(cx + np.cos(angle) * r + np.sin(step * 0.065) * 0.45))
-            y = int(round(cy + np.sin(angle) * r + np.cos(step * 0.071) * 0.45))
-            if not (0 <= x < self.width and 0 <= y < self.height):
-                break
-            self.grid[y, x] = Tile.HIGHWAY if step > length * 0.45 else Tile.ROAD
-
-            # Give radial roads body width.
-            for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
-                if 0 <= nx < self.width and 0 <= ny < self.height and self.grid[ny, nx] == Tile.EMPTY:
-                    self.grid[ny, nx] = Tile.ROAD
-
-    def _grow_local_streets(self, start: Position, rng: np.random.Generator, steps: int) -> None:
-        x, y = start
-        direction = (1, 0)
-        directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
-        for i in range(steps):
-            if not (1 <= x < self.width - 1 and 1 <= y < self.height - 1):
-                break
-            if self.grid[y, x] == Tile.EMPTY:
-                self.grid[y, x] = Tile.ROAD
-
-            # Occasional lane branches.
-            if i % 11 == 0:
-                for bx, by in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
-                    if 1 <= bx < self.width - 1 and 1 <= by < self.height - 1 and float(rng.random()) < 0.32:
-                        self.grid[by, bx] = Tile.ROAD
-
-            if float(rng.random()) < 0.18:
-                direction = directions[int(rng.integers(0, len(directions)))]
-
-            x += int(direction[0])
-            y += int(direction[1])
-
-    def _promote_intersections(self) -> None:
-        for y in range(self.height):
-            for x in range(self.width):
-                tile = Tile(self.grid[y, x])
-                if tile not in DRIVABLE_TILES:
-                    continue
-                neighbors = 0
-                for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
-                    if 0 <= nx < self.width and 0 <= ny < self.height:
-                        if Tile(self.grid[ny, nx]) in DRIVABLE_TILES:
-                            neighbors += 1
-                if neighbors >= 3:
-                    self.grid[y, x] = Tile.INTERSECTION
-
-    def in_bounds(self, pos: Position) -> bool:
-        x, y = pos
+    def in_bounds(self, x: int, y: int) -> bool:
         return 0 <= x < self.width and 0 <= y < self.height
 
-    def get_tile(self, pos: Position) -> Tile:
-        x, y = pos
-        return Tile(self.grid[y, x])
+    def is_drivable(self, x: int, y: int) -> bool:
+        """Cars can only drive on road, highway, or intersection tiles."""
+        return self.get(x, y) in (ROAD, HIGHWAY, INTERSECTION)
 
-    def set_tile(self, pos: Position, tile: Tile) -> None:
-        x, y = pos
-        if self.in_bounds(pos):
-            self.grid[y, x] = tile
+    # ------------------------------------------------------------------
+    # Neighbour / connectivity helpers
+    # ------------------------------------------------------------------
 
-    def is_drivable(self, pos: Position) -> bool:
-        if not self.in_bounds(pos):
-            return False
-        return self.get_tile(pos) in DRIVABLE_TILES
+    def neighbours(self, x: int, y: int):
+        """Yield drivable 4-connected neighbours of (x, y)."""
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            nx, ny = x + dx, y + dy
+            if self.in_bounds(nx, ny) and self.is_drivable(nx, ny):
+                yield (nx, ny)
 
-    def neighbors4(self, pos: Position) -> List[Position]:
-        x, y = pos
-        candidates = ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1))
-        return [p for p in candidates if self.is_drivable(p)]
+    def all_drivable_tiles(self):
+        """Return a list of (x, y) tuples for every drivable cell."""
+        positions = []
+        for y in range(self.height):
+            for x in range(self.width):
+                if self.is_drivable(x, y):
+                    positions.append((x, y))
+        return positions
 
-    def random_drivable_tile(self, rng: np.random.Generator) -> Optional[Position]:
-        ys, xs = np.where(np.isin(self.grid, list(DRIVABLE_TILES)))
-        if len(xs) == 0:
-            return None
-        idx = int(rng.integers(0, len(xs)))
-        return int(xs[idx]), int(ys[idx])
+    # ------------------------------------------------------------------
+    # Pre-built city layouts
+    # ------------------------------------------------------------------
 
-    def drivable_count(self) -> int:
-        return int(np.isin(self.grid, list(DRIVABLE_TILES)).sum())
+    def build_grid_city(self, block_size: int = 4) -> None:
+        """
+        Create a simple grid-street city.
+        Streets run every `block_size` cells in both axes.
+        Intersections are placed where horizontal and vertical roads meet.
+        """
+        self.grid[:] = EMPTY  # reset
 
-    def as_numpy(self) -> np.ndarray:
-        return self.grid.copy()
+        road_cols = list(range(0, self.width,  block_size))
+        road_rows = list(range(0, self.height, block_size))
+
+        # Lay horizontal roads
+        for row in road_rows:
+            for x in range(self.width):
+                self.set(x, row, ROAD)
+
+        # Lay vertical roads
+        for col in road_cols:
+            for y in range(self.height):
+                self.set(col, y, ROAD)
+
+        # Mark intersections where roads cross
+        for row in road_rows:
+            for col in road_cols:
+                self.set(col, row, INTERSECTION)
+
+        # Upgrade every other horizontal road to highway
+        for i, row in enumerate(road_rows):
+            if i % 2 == 0:
+                for x in range(self.width):
+                    if self.get(x, row) == ROAD:  # don't overwrite intersections
+                        self.set(x, row, HIGHWAY)
+
+    def build_random_city(self, road_density: float = 0.3) -> None:
+        """
+        Scatter roads randomly, then mark obvious intersections.
+        Useful for stress-testing the pathfinder.
+        """
+        self.grid[:] = EMPTY
+        for y in range(self.height):
+            for x in range(self.width):
+                if random.random() < road_density:
+                    self.set(x, y, ROAD)
+
+        # Any road tile with ≥3 drivable neighbours becomes an intersection
+        for y in range(self.height):
+            for x in range(self.width):
+                if self.get(x, y) == ROAD:
+                    nb = list(self.neighbours(x, y))
+                    if len(nb) >= 3:
+                        self.set(x, y, INTERSECTION)
+
+    # ------------------------------------------------------------------
+    # RL action helpers
+    # ------------------------------------------------------------------
+
+    def add_road(self, x: int, y: int) -> bool:
+        """Place a ROAD tile if the cell is currently EMPTY. Returns True on success."""
+        if self.get(x, y) == EMPTY:
+            self.set(x, y, ROAD)
+            return True
+        return False
+
+    def upgrade_to_highway(self, x: int, y: int) -> bool:
+        """Upgrade ROAD → HIGHWAY. Returns True on success."""
+        if self.get(x, y) == ROAD:
+            self.set(x, y, HIGHWAY)
+            return True
+        return False
+
+    def add_intersection(self, x: int, y: int) -> bool:
+        """Upgrade ROAD or HIGHWAY → INTERSECTION. Returns True on success."""
+        if self.get(x, y) in (ROAD, HIGHWAY):
+            self.set(x, y, INTERSECTION)
+            return True
+        return False
+
+    # ------------------------------------------------------------------
+    # Utility
+    # ------------------------------------------------------------------
+
+    def __repr__(self) -> str:
+        symbols = {EMPTY: ".", ROAD: "+", HIGHWAY: "=", INTERSECTION: "X"}
+        rows = []
+        for y in range(self.height):
+            row = " ".join(symbols.get(self.grid[y, x], "?") for x in range(self.width))
+            rows.append(row)
+        return "\n".join(rows)

@@ -1,248 +1,334 @@
-from __future__ import annotations
+"""
+traffic_sim.py
+--------------
+Car class, A* pathfinding, and the SimulationEngine that runs discrete ticks.
 
-from dataclasses import dataclass, field
+Key design decisions
+--------------------
+- One car occupies exactly one tile at a time.
+- A car "owns" its current position in the engine's occupancy set so that
+  other cars can check for collisions in O(1).
+- Intersections act as single-slot queues: only one car may enter per tick.
+"""
+
 import heapq
-from typing import Dict, List, Optional, Set, Tuple
+import random
+from dataclasses import dataclass, field
+from typing import List, Optional, Tuple, Dict
 
-import numpy as np
+from grid import CityGrid, EMPTY, ROAD, HIGHWAY, INTERSECTION
 
-from grid import CityGrid, Position, Tile
-
-
-@dataclass
-class Car:
-    car_id: int
-    position: Position
-    destination: Position
-    path: List[Position] = field(default_factory=list)
-    spawn_tick: int = 0
-    arrived_tick: Optional[int] = None
-    stopped_ticks: int = 0
+# ---------------------------------------------------------------------------
+# Movement cost per tile type (lower = faster road)
+# ---------------------------------------------------------------------------
+MOVE_COST = {
+    ROAD:         2,   # normal road: slower
+    HIGHWAY:      1,   # highway:     faster
+    INTERSECTION: 2,   # treat like road for pathfinding
+}
 
 
-def _tile_movement_cost(tile: Tile) -> float:
-    if tile == Tile.HIGHWAY:
-        return 0.6
-    if tile == Tile.INTERSECTION:
-        return 1.1
-    return 1.0
+# ---------------------------------------------------------------------------
+# A* pathfinder
+# ---------------------------------------------------------------------------
 
-
-def _heuristic(a: Position, b: Position) -> int:
+def heuristic(a: Tuple[int, int], b: Tuple[int, int]) -> int:
+    """Manhattan distance – admissible heuristic for 4-connected grids."""
     return abs(a[0] - b[0]) + abs(a[1] - b[1])
 
 
-def astar_path(grid: CityGrid, start: Position, goal: Position) -> List[Position]:
-    """Return a path from start to goal (excluding start), or empty list if none."""
+def astar(grid: CityGrid,
+          start: Tuple[int, int],
+          goal: Tuple[int, int]) -> Optional[List[Tuple[int, int]]]:
+    """
+    Return the shortest drivable path from start to goal, or None if
+    no path exists.  Path includes both endpoints.
+    """
     if start == goal:
-        return []
-    if not grid.is_drivable(start) or not grid.is_drivable(goal):
-        return []
+        return [start]
 
-    frontier: List[Tuple[float, Position]] = []
-    heapq.heappush(frontier, (0.0, start))
+    # open_set entries: (f_score, g_score, position)
+    open_set: List[Tuple[int, int, Tuple[int, int]]] = []
+    heapq.heappush(open_set, (heuristic(start, goal), 0, start))
 
-    came_from: Dict[Position, Optional[Position]] = {start: None}
-    cost_so_far: Dict[Position, float] = {start: 0.0}
+    came_from: Dict[Tuple[int, int], Optional[Tuple[int, int]]] = {start: None}
+    g_score:   Dict[Tuple[int, int], int] = {start: 0}
 
-    while frontier:
-        _, current = heapq.heappop(frontier)
+    while open_set:
+        _, g, current = heapq.heappop(open_set)
 
         if current == goal:
-            break
+            # Reconstruct path
+            path = []
+            node: Optional[Tuple[int, int]] = current
+            while node is not None:
+                path.append(node)
+                node = came_from[node]
+            path.reverse()
+            return path
 
-        for nxt in grid.neighbors4(current):
-            move_cost = _tile_movement_cost(grid.get_tile(nxt))
-            new_cost = cost_so_far[current] + move_cost
-            if nxt not in cost_so_far or new_cost < cost_so_far[nxt]:
-                cost_so_far[nxt] = new_cost
-                priority = new_cost + _heuristic(nxt, goal)
-                heapq.heappush(frontier, (priority, nxt))
-                came_from[nxt] = current
+        # Skip stale open-set entries
+        if g > g_score.get(current, float("inf")):
+            continue
 
-    if goal not in came_from:
-        return []
+        for nb in grid.neighbours(*current):
+            cost     = MOVE_COST.get(grid.get(*nb), 2)
+            new_g    = g_score[current] + cost
+            if new_g < g_score.get(nb, float("inf")):
+                g_score[nb]  = new_g
+                came_from[nb] = current
+                f             = new_g + heuristic(nb, goal)
+                heapq.heappush(open_set, (f, new_g, nb))
 
-    path_rev = []
-    cur = goal
-    while cur != start:
-        path_rev.append(cur)
-        parent = came_from.get(cur)
-        if parent is None:
-            return []
-        cur = parent
-    path_rev.reverse()
-    return path_rev
+    return None  # no path found
 
 
-class TrafficSimulation:
-    def __init__(
-        self,
-        grid: CityGrid,
-        spawn_probability: float = 0.35,
-        max_cars: int = 220,
-        seed: int = 7,
-    ) -> None:
-        self.grid = grid
-        self.spawn_probability = spawn_probability
-        self.max_cars = max_cars
-        self.rng = np.random.default_rng(seed)
+# ---------------------------------------------------------------------------
+# Car
+# ---------------------------------------------------------------------------
 
-        self.tick_count = 0
-        self.next_car_id = 1
+@dataclass
+class Car:
+    """
+    A single vehicle navigating the grid.
 
-        self.cars: Dict[int, Car] = {}
-        self.occupancy: Dict[Position, int] = {}
+    Attributes
+    ----------
+    car_id      : unique integer identifier
+    position    : current (x, y) tile
+    destination : target (x, y) tile
+    path        : remaining waypoints (index 0 = next step)
+    travel_time : ticks elapsed since spawning
+    stopped     : True when the car cannot move this tick
+    waiting_at_intersection : ticks spent queuing at intersections
+    """
+    car_id:      int
+    position:    Tuple[int, int]
+    destination: Tuple[int, int]
+    path:        List[Tuple[int, int]] = field(default_factory=list)
 
-        self.completed_trip_count = 0
-        self.total_trip_time = 0.0
+    travel_time: int  = 0
+    stopped:     bool = False
+    waiting_at_intersection: int = 0
 
-        # Intersections may only accept one entering car per tick.
-        self.intersection_used_this_tick: Set[Position] = set()
+    def has_arrived(self) -> bool:
+        return self.position == self.destination
 
-    def reset_runtime(self) -> None:
-        self.tick_count = 0
-        self.next_car_id = 1
+    def next_step(self) -> Optional[Tuple[int, int]]:
+        """Return the next tile in the path without consuming it."""
+        return self.path[0] if self.path else None
+
+    def advance(self) -> None:
+        """Move to the next path tile (call only after clearing collisions)."""
+        if self.path:
+            self.position = self.path.pop(0)
+        self.travel_time += 1
+
+    def tick_stopped(self) -> None:
+        """Record a stopped tick without moving."""
+        self.stopped = True
+        self.travel_time += 1
+
+
+# ---------------------------------------------------------------------------
+# Simulation Engine
+# ---------------------------------------------------------------------------
+
+class SimulationEngine:
+    """
+    Manages the collection of cars and advances the simulation one tick at a
+    time.
+
+    Metrics tracked
+    ---------------
+    - average_travel_time : mean ticks across all active + completed cars
+    - stopped_cars        : count of cars that could not move last tick
+    - congestion_map      : numpy array, cars-per-tile at current tick
+    """
+
+    def __init__(self, grid: CityGrid,
+                 max_cars: int = 30,
+                 spawn_rate: float = 0.3):
+        """
+        Parameters
+        ----------
+        grid        : CityGrid instance
+        max_cars    : cap on simultaneous cars
+        spawn_rate  : probability of spawning a new car each tick
+                      (only if below max_cars)
+        """
+        import numpy as np
+        self.grid       = grid
+        self.max_cars   = max_cars
+        self.spawn_rate = spawn_rate
+
+        self.cars:      List[Car] = []
+        self.completed: List[Car] = []   # cars that reached destination
+        self._next_id:  int       = 0
+        self.tick_count: int      = 0
+
+        # Set of occupied positions for O(1) collision checks
+        self._occupied: set = set()
+
+        # Intersection "locks": at most one car enters per intersection per tick
+        self._intersection_locks: set = set()
+
+        self.np = np
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def reset(self) -> None:
+        """Clear all cars and counters."""
         self.cars.clear()
-        self.occupancy.clear()
-        self.completed_trip_count = 0
-        self.total_trip_time = 0.0
+        self.completed.clear()
+        self._occupied.clear()
+        self._next_id  = 0
+        self.tick_count = 0
 
-    def _pick_spawn_and_destination(self) -> Optional[Tuple[Position, Position, List[Position]]]:
-        tries = 24
-        for _ in range(tries):
-            start = self.grid.random_drivable_tile(self.rng)
-            goal = self.grid.random_drivable_tile(self.rng)
-            if start is None or goal is None or start == goal:
-                continue
-            if start in self.occupancy:
-                continue
-            route = astar_path(self.grid, start, goal)
-            if route:
-                return start, goal, route
-        return None
-
-    def spawn_car_if_needed(self) -> None:
-        if len(self.cars) >= self.max_cars:
-            return
-        if float(self.rng.random()) > self.spawn_probability:
-            return
-
-        choice = self._pick_spawn_and_destination()
-        if not choice:
-            return
-
-        start, goal, route = choice
-        car = Car(
-            car_id=self.next_car_id,
-            position=start,
-            destination=goal,
-            path=route,
-            spawn_tick=self.tick_count,
-        )
-        self.cars[car.car_id] = car
-        self.occupancy[start] = car.car_id
-        self.next_car_id += 1
-
-    def _can_enter(self, next_pos: Position) -> bool:
-        tile = self.grid.get_tile(next_pos)
-        if tile != Tile.INTERSECTION:
-            return True
-        if next_pos in self.intersection_used_this_tick:
-            return False
-        return True
-
-    def _mark_enter(self, next_pos: Position) -> None:
-        if self.grid.get_tile(next_pos) == Tile.INTERSECTION:
-            self.intersection_used_this_tick.add(next_pos)
-
-    def _advance_car(self, car: Car) -> None:
-        if car.position == car.destination:
-            return
-
-        if not car.path:
-            # Replan in case map changed.
-            car.path = astar_path(self.grid, car.position, car.destination)
-            if not car.path:
-                car.stopped_ticks += 1
-                return
-
-        next_pos = car.path[0]
-
-        # Stop if occupied by another car.
-        if next_pos in self.occupancy:
-            car.stopped_ticks += 1
-            return
-
-        # Intersection queue policy.
-        if not self._can_enter(next_pos):
-            car.stopped_ticks += 1
-            return
-
-        old_pos = car.position
-        car.position = next_pos
-        car.path.pop(0)
-
-        self.occupancy.pop(old_pos, None)
-        self.occupancy[next_pos] = car.car_id
-        self._mark_enter(next_pos)
-
-    def _complete_arrivals(self) -> None:
-        arrived_ids: List[int] = []
-        for car_id, car in self.cars.items():
-            if car.position == car.destination:
-                car.arrived_tick = self.tick_count
-                self.total_trip_time += float(car.arrived_tick - car.spawn_tick)
-                self.completed_trip_count += 1
-                arrived_ids.append(car_id)
-
-        for car_id in arrived_ids:
-            pos = self.cars[car_id].position
-            self.occupancy.pop(pos, None)
-            self.cars.pop(car_id, None)
-
-    def step(self) -> None:
+    def step(self) -> Dict:
+        """
+        Advance simulation by one tick.
+        Returns a metrics dict.
+        """
         self.tick_count += 1
-        self.intersection_used_this_tick.clear()
+        self._intersection_locks.clear()
 
-        self.spawn_car_if_needed()
+        # Mark all cars as not-stopped at start of tick
+        for car in self.cars:
+            car.stopped = False
 
-        # Randomized update order avoids deterministic lane priority.
-        car_ids = list(self.cars.keys())
-        self.rng.shuffle(car_ids)
-        for car_id in car_ids:
-            car = self.cars.get(car_id)
-            if car is not None:
-                self._advance_car(car)
+        # Move cars (shuffle to avoid systematic bias)
+        order = list(range(len(self.cars)))
+        random.shuffle(order)
 
-        self._complete_arrivals()
+        for i in order:
+            if i >= len(self.cars):
+                continue
+            car = self.cars[i]
+            self._try_move(car)
 
-    def traffic_density_map(self) -> np.ndarray:
-        density = np.zeros((self.grid.height, self.grid.width), dtype=np.float32)
-        for car in self.cars.values():
-            x, y = car.position
-            density[y, x] += 1.0
-        return density
+        # Remove arrived cars
+        arrived = [c for c in self.cars if c.has_arrived()]
+        for c in arrived:
+            self._occupied.discard(c.position)
+            self.completed.append(c)
+        self.cars = [c for c in self.cars if not c.has_arrived()]
 
-    def metrics(self) -> Dict[str, float]:
-        avg_travel_time = (
-            self.total_trip_time / self.completed_trip_count
-            if self.completed_trip_count > 0
-            else 0.0
+        # Spawn new cars
+        self._maybe_spawn()
+
+        return self.metrics()
+
+    def metrics(self) -> Dict:
+        """Return a snapshot of current simulation metrics."""
+        all_cars = self.cars + self.completed
+        avg_travel = (sum(c.travel_time for c in all_cars) / len(all_cars)
+                      if all_cars else 0.0)
+
+        stopped = sum(1 for c in self.cars if c.stopped)
+
+        congestion = self.np.zeros(
+            (self.grid.height, self.grid.width), dtype=np.float32
         )
-        stopped = 0
-        for car in self.cars.values():
-            if car.path and car.path[0] in self.occupancy:
-                stopped += 1
-
-        drivable = max(1, self.grid.drivable_count())
-        congestion = len(self.cars) / drivable
+        for c in self.cars:
+            x, y = c.position
+            congestion[y, x] += 1
 
         return {
-            "tick": float(self.tick_count),
-            "cars_active": float(len(self.cars)),
-            "cars_completed": float(self.completed_trip_count),
-            "average_travel_time": float(avg_travel_time),
-            "stopped_cars": float(stopped),
-            "congestion": float(congestion),
+            "tick":             self.tick_count,
+            "active_cars":      len(self.cars),
+            "completed_cars":   len(self.completed),
+            "avg_travel_time":  round(avg_travel, 2),
+            "stopped_cars":     stopped,
+            "congestion_map":   congestion,
         }
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _try_move(self, car: Car) -> None:
+        """Attempt to move a car one step along its path."""
+        nxt = car.next_step()
+
+        if nxt is None:
+            # Path exhausted but not at destination → replan
+            if not car.has_arrived():
+                self._replan(car)
+                nxt = car.next_step()
+
+        if nxt is None:
+            car.tick_stopped()
+            return
+
+        # Collision: another car is already on the next tile
+        if nxt in self._occupied:
+            car.tick_stopped()
+            return
+
+        # Intersection queue: only one car per intersection per tick
+        if self.grid.get(*nxt) == INTERSECTION:
+            if nxt in self._intersection_locks:
+                car.tick_stopped()
+                car.waiting_at_intersection += 1
+                return
+            self._intersection_locks.add(nxt)
+
+        # All clear – move
+        self._occupied.discard(car.position)
+        self._occupied.add(nxt)
+        car.advance()
+
+    def _replan(self, car: Car) -> None:
+        """Re-run A* for a car that lost its path."""
+        path = astar(self.grid, car.position, car.destination)
+        if path and len(path) > 1:
+            car.path = path[1:]  # skip current position
+        else:
+            car.path = []
+
+    def _maybe_spawn(self) -> None:
+        """Randomly spawn a new car if below max_cars."""
+        if len(self.cars) >= self.max_cars:
+            return
+        if random.random() > self.spawn_rate:
+            return
+
+        drivable = self.grid.all_drivable_tiles()
+        if len(drivable) < 2:
+            return
+
+        # Pick a free spawn tile
+        attempts = 0
+        while attempts < 10:
+            start = random.choice(drivable)
+            if start not in self._occupied:
+                break
+            attempts += 1
+        else:
+            return
+
+        # Pick a distinct destination
+        dest_candidates = [t for t in drivable if t != start]
+        if not dest_candidates:
+            return
+        dest = random.choice(dest_candidates)
+
+        path = astar(self.grid, start, dest)
+        if path is None or len(path) < 2:
+            return  # no valid route
+
+        car = Car(
+            car_id      = self._next_id,
+            position    = start,
+            destination = dest,
+            path        = path[1:],   # first step already "occupied"
+        )
+        self._next_id += 1
+        self.cars.append(car)
+        self._occupied.add(start)
+
+
+import numpy as np  # make np available at module level for metrics()

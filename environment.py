@@ -1,91 +1,220 @@
-from __future__ import annotations
+"""
+environment.py
+--------------
+A Gym-style environment wrapping the city traffic simulation.
+Designed so a Stable-Baselines3 agent (e.g. PPO) can be plugged in with
+minimal changes later.
 
-from dataclasses import dataclass
-from typing import Dict, Optional, Tuple
+Observation space
+-----------------
+  Shape: (3, H, W)  – three "image" channels stacked
+    [0] grid layout   (normalised cell type: 0-1)
+    [1] traffic density per tile (0-1, clipped)
+    [2] intersection map (binary)
+
+Action space  (Discrete: 3 action types × grid cells)
+--------------
+  Encoded as a single integer:  action = action_type * (H*W) + tile_index
+    action_type 0 → add_road       at tile (x,y)
+    action_type 1 → upgrade_highway at tile (x,y)
+    action_type 2 → add_intersection at tile (x,y)
+
+Reward
+------
+  Each step:
+    -0.1  × avg_travel_time
+    -0.5  × stopped_cars
+    -0.2  × mean(congestion)
+    -1.0  build penalty (if action changed the grid)
+"""
 
 import numpy as np
+from grid import CityGrid, EMPTY, ROAD, HIGHWAY, INTERSECTION
+from traffic_sim import SimulationEngine
 
-from grid import CityGrid, Position, Tile
-from traffic_sim import TrafficSimulation
-
-
-Action = Tuple[int, int, int]
-
-
-@dataclass
-class TrafficEnvConfig:
-    width: int = 20
-    height: int = 20
-    max_steps: int = 1500
+# Max density value for normalisation (cars/tile)
+MAX_DENSITY = 5.0
 
 
-class CityTrafficEnv:
-    """Gym-style wrapper for map-edit actions over the running traffic simulation."""
+class TrafficEnv:
+    """
+    Gym-compatible environment for the city traffic simulation.
 
-    def __init__(self, config: Optional[TrafficEnvConfig] = None, seed: int = 7) -> None:
-        self.config = config or TrafficEnvConfig()
-        self.seed = seed
+    Usage
+    -----
+    env = TrafficEnv()
+    obs = env.reset()
+    obs, reward, done, info = env.step(action)
+    """
 
-        self.grid = CityGrid(width=self.config.width, height=self.config.height)
-        self.sim = TrafficSimulation(self.grid, seed=self.seed)
-        self.steps = 0
+    # Reward shaping weights
+    W_TRAVEL_TIME   = 0.10
+    W_STOPPED       = 0.50
+    W_CONGESTION    = 0.20
+    W_BUILD_PENALTY = 1.00
 
-    def _observation(self) -> Dict[str, np.ndarray]:
-        return {
-            "grid": self.grid.as_numpy().astype(np.int16),
-            "density": self.sim.traffic_density_map(),
-        }
+    def __init__(self,
+                 width: int = 20,
+                 height: int = 20,
+                 max_cars: int = 30,
+                 spawn_rate: float = 0.3,
+                 episode_length: int = 200):
 
-    def reset(self) -> Dict[str, np.ndarray]:
-        self.grid = CityGrid(width=self.config.width, height=self.config.height)
-        self.sim = TrafficSimulation(self.grid, seed=self.seed)
-        self.steps = 0
-        return self._observation()
+        self.width          = width
+        self.height         = height
+        self.episode_length = episode_length
 
-    def _apply_action(self, action: Action) -> float:
-        """Action format: (action_type, x, y). Returns build-cost penalty."""
-        action_type, x, y = action
-        pos: Position = (int(x), int(y))
+        # --- observation / action dimensions ---
+        self.n_channels  = 3
+        self.obs_shape   = (self.n_channels, height, width)
+        self.n_actions   = 3 * height * width   # 3 action types × every tile
 
-        if not self.grid.in_bounds(pos):
-            return -0.05
+        # --- internals ---
+        self.grid   = CityGrid(width, height)
+        self.engine = SimulationEngine(self.grid,
+                                       max_cars=max_cars,
+                                       spawn_rate=spawn_rate)
+        self._t      = 0
+        self._last_metrics: dict = {}
 
-        tile = self.grid.get_tile(pos)
+    # ------------------------------------------------------------------
+    # Core Gym interface
+    # ------------------------------------------------------------------
 
+    def reset(self) -> np.ndarray:
+        """
+        Reset the environment to a fresh grid city.
+        Returns the initial observation.
+        """
+        self.grid.build_grid_city(block_size=4)
+        self.engine.reset()
+        self._t = 0
+        # Run one warm-up tick so cars exist from the first observation
+        self._last_metrics = self.engine.step()
+        return self._build_observation()
+
+    def step(self, action: int):
+        """
+        Apply an action, advance the simulation one tick, return
+        (observation, reward, done, info).
+
+        Parameters
+        ----------
+        action : int  –  encoded action (see module docstring)
+        """
+        # --- decode action ---
+        action_type = action // (self.height * self.width)
+        tile_index  = action  % (self.height * self.width)
+        tile_y      = tile_index // self.width
+        tile_x      = tile_index  % self.width
+
+        grid_changed = self._apply_action(action_type, tile_x, tile_y)
+
+        # --- advance simulation ---
+        self._last_metrics = self.engine.step()
+        self._t += 1
+
+        # --- compute reward ---
+        reward = self._compute_reward(grid_changed)
+
+        # --- check termination ---
+        done = self._t >= self.episode_length
+
+        obs  = self._build_observation()
+        info = {**self._last_metrics, "grid_changed": grid_changed}
+
+        return obs, reward, done, info
+
+    # ------------------------------------------------------------------
+    # Action application
+    # ------------------------------------------------------------------
+
+    def _apply_action(self, action_type: int, x: int, y: int) -> bool:
+        """
+        Apply one of the three grid-modification actions.
+        Returns True if the grid was actually modified.
+        """
         if action_type == 0:
-            # Add road.
-            if tile == Tile.EMPTY:
-                self.grid.set_tile(pos, Tile.ROAD)
-                return -0.02
-            return -0.005
+            return self.grid.add_road(x, y)
+        elif action_type == 1:
+            return self.grid.upgrade_to_highway(x, y)
+        elif action_type == 2:
+            return self.grid.add_intersection(x, y)
+        return False
 
-        if action_type == 1:
-            # Upgrade road to highway.
-            if tile == Tile.ROAD:
-                self.grid.set_tile(pos, Tile.HIGHWAY)
-                return -0.03
-            return -0.005
+    # ------------------------------------------------------------------
+    # Observation builder
+    # ------------------------------------------------------------------
 
-        if action_type == 2:
-            # Add/force intersection.
-            if tile in (Tile.ROAD, Tile.HIGHWAY):
-                self.grid.set_tile(pos, Tile.INTERSECTION)
-                return -0.02
-            return -0.005
+    def _build_observation(self) -> np.ndarray:
+        """
+        Construct the (3, H, W) observation array.
+        Channel 0: normalised cell type (0=empty … 3=intersection → /3)
+        Channel 1: normalised traffic density (clipped to [0, 1])
+        Channel 2: binary intersection mask
+        """
+        obs = np.zeros(self.obs_shape, dtype=np.float32)
 
-        return -0.01
+        # Channel 0 – grid layout
+        obs[0] = self.grid.grid.astype(np.float32) / 3.0
 
-    def step(self, action: Action):
-        build_penalty = self._apply_action(action)
-        self.sim.step()
-        self.steps += 1
+        # Channel 1 – traffic density
+        cmap = self._last_metrics.get(
+            "congestion_map",
+            np.zeros((self.height, self.width), dtype=np.float32)
+        )
+        obs[1] = np.clip(cmap / MAX_DENSITY, 0.0, 1.0)
 
-        metrics = self.sim.metrics()
-        travel_penalty = -0.02 * metrics["average_travel_time"]
-        congestion_penalty = -1.5 * metrics["congestion"]
-        reward = travel_penalty + congestion_penalty + build_penalty
+        # Channel 2 – intersection mask
+        obs[2] = (self.grid.grid == INTERSECTION).astype(np.float32)
 
-        done = self.steps >= self.config.max_steps
-        info = metrics
+        return obs
 
-        return self._observation(), float(reward), bool(done), info
+    # ------------------------------------------------------------------
+    # Reward computation
+    # ------------------------------------------------------------------
+
+    def _compute_reward(self, grid_changed: bool) -> float:
+        m = self._last_metrics
+
+        avg_travel  = m.get("avg_travel_time", 0.0)
+        stopped     = m.get("stopped_cars",    0)
+        cmap        = m.get("congestion_map",  np.zeros(1))
+        mean_cong   = float(np.mean(cmap))
+
+        reward  = 0.0
+        reward -= self.W_TRAVEL_TIME   * avg_travel
+        reward -= self.W_STOPPED       * stopped
+        reward -= self.W_CONGESTION    * mean_cong
+        if grid_changed:
+            reward -= self.W_BUILD_PENALTY
+
+        return float(reward)
+
+    # ------------------------------------------------------------------
+    # Convenience properties (for external tools / SB3)
+    # ------------------------------------------------------------------
+
+    @property
+    def observation_space_shape(self):
+        """Shape tuple – use to build a gym.spaces.Box later."""
+        return self.obs_shape
+
+    @property
+    def action_space_n(self):
+        """Number of discrete actions – use to build a gym.spaces.Discrete."""
+        return self.n_actions
+
+    def render_text(self) -> str:
+        """Simple ASCII render for debugging."""
+        m = self._last_metrics
+        lines = [
+            f"Tick {self._t}",
+            f"  Active cars   : {m.get('active_cars', 0)}",
+            f"  Completed     : {m.get('completed_cars', 0)}",
+            f"  Avg travel    : {m.get('avg_travel_time', 0):.2f} ticks",
+            f"  Stopped cars  : {m.get('stopped_cars', 0)}",
+            "",
+            str(self.grid),
+        ]
+        return "\n".join(lines)
