@@ -113,6 +113,18 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 #ai-bar-fill{height:100%;width:0%;background:var(--green);transition:width .2s}
 #ai-meta{font-size:8px;color:var(--dim);letter-spacing:.05em}
 
+#stop-panel{top:118px;right:13px;min-width:230px;pointer-events:auto}
+#stop-panel.hidden{display:none}
+#stop-panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+#stop-panel-title{font-size:9px;letter-spacing:.12em;color:var(--accent)}
+#btn-stop-panel-close{
+  border:1px solid var(--border);background:transparent;color:var(--dim);
+  width:16px;height:16px;line-height:14px;font-size:10px;cursor:pointer;
+}
+#btn-stop-panel-close:hover{color:var(--accent)}
+.sr-row{display:flex;justify-content:space-between;gap:10px;font-size:8px;letter-spacing:.04em;color:var(--text);margin-bottom:2px}
+.sr-row span:last-child{color:#dbe4f5}
+
 /* generation overlay */
 #gen-overlay{
   position:absolute;inset:0;background:rgba(13,15,20,.85);
@@ -157,6 +169,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <button class="hbtn" id="btn-zin">+</button>
     <button class="hbtn" id="btn-pause">Pause</button>
     <button class="hbtn" id="btn-regen">New City</button>
+    <button class="hbtn" id="btn-stop-panel-toggle">Stops</button>
     <button class="hbtn" id="btn-export-map">Export Map</button>
     <button class="hbtn" id="btn-import-map">Import Map</button>
     <button class="hbtn" id="btn-ai-train">Train AI</button>
@@ -182,7 +195,19 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <div id="ai-bar"><div id="ai-bar-fill"></div></div>
     <div id="ai-meta">Epoch 0/0 | best score n/a</div>
   </div>
-  <div id="version-tag">V5.1</div>
+  <div class="panel" id="stop-panel">
+    <div id="stop-panel-head">
+      <div id="stop-panel-title">STOP REASONS</div>
+      <button id="btn-stop-panel-close" title="Hide stop panel">×</button>
+    </div>
+    <div class="sr-row"><span>Stopped this tick</span><span id="sr-current">0</span></div>
+    <div class="sr-row"><span>No route found</span><span id="sr-no-route">0</span></div>
+    <div class="sr-row"><span>Tile blocked</span><span id="sr-blocked">0</span></div>
+    <div class="sr-row"><span>Red signal</span><span id="sr-red">0</span></div>
+    <div class="sr-row"><span>Intersection lock</span><span id="sr-lock">0</span></div>
+    <div class="sr-row"><span>Freeze events</span><span id="sr-freeze">0</span></div>
+  </div>
+  <div id="version-tag">V5.2</div>
   <div class="panel" id="zoom-tip" style="bottom:13px;left:50%;transform:translateX(-50%)">Scroll · zoom &nbsp;|&nbsp; Drag · pan &nbsp;|&nbsp; New City · regenerate</div>
 </div>
 
@@ -331,7 +356,7 @@ function clone2d(arr){
 function exportMapState(){
   return {
     format: 'CityFlowMap',
-    version: 'V5.1',
+    version: 'V5.2',
     width: GW,
     height: GH,
     grid: clone2d(grid),
@@ -1116,6 +1141,29 @@ let drvByZone={};
 let metricsFrozen=false;
 let fullStopStreak=0;
 const FREEZE_AFTER_FULL_STOP_TICKS=20;
+const stopStats={
+  noRoute:0,
+  blocked:0,
+  redSignal:0,
+  intersectionLock:0,
+  freezeEvents:0,
+};
+
+function resetStopStats(){
+  stopStats.noRoute=0;
+  stopStats.blocked=0;
+  stopStats.redSignal=0;
+  stopStats.intersectionLock=0;
+  stopStats.freezeEvents=0;
+}
+
+function recordStop(reason){
+  stoppedN++;
+  if(reason==='noRoute')stopStats.noRoute++;
+  else if(reason==='blocked')stopStats.blocked++;
+  else if(reason==='redSignal')stopStats.redSignal++;
+  else if(reason==='intersectionLock')stopStats.intersectionLock++;
+}
 
 function buildDrvCache(){
   drvTilesCache=[];drvByZone={};
@@ -1138,6 +1186,7 @@ function simReset(){
   drvTilesCache=null;
   metricsFrozen=false;
   fullStopStreak=0;
+  resetStopStats();
 }
 
 function currentHour(){return(simTime*24|0)%24;}
@@ -1246,13 +1295,13 @@ function simStep(){
     let nxt=c.nextStep();
     if(!nxt){
       if(!c.arrived){const p=astar(c.x,c.y,c.gx,c.gy);if(p&&p.length>1){c.path=p.slice(1);nxt=c.nextStep();}}
-      if(!nxt){c.tickStop();stoppedN++;continue;}
+      if(!nxt){c.tickStop();recordStop('noRoute');continue;}
     }
     const nk=oKey(nxt.x,nxt.y);
-    if(occupied.has(nk)){c.tickStop();stoppedN++;continue;}
+    if(occupied.has(nk)){c.tickStop();recordStop('blocked');continue;}
     if(grid[nxt.y][nxt.x]===INTER){
-      if(!signalAllows(nxt.x,nxt.y,nxt.dx,nxt.dy)){c.tickStop();stoppedN++;continue;}
-      if(interLocks.has(nk)){c.tickStop();stoppedN++;continue;}
+      if(!signalAllows(nxt.x,nxt.y,nxt.dx,nxt.dy)){c.tickStop();recordStop('redSignal');continue;}
+      if(interLocks.has(nk)){c.tickStop();recordStop('intersectionLock');continue;}
       interLocks.set(nk,c.id);
     }
     occupied.delete(oKey(c.x,c.y));
@@ -1272,6 +1321,7 @@ function simStep(){
     fullStopStreak++;
     if(fullStopStreak>=FREEZE_AFTER_FULL_STOP_TICKS){
       metricsFrozen=true;
+      stopStats.freezeEvents++;
       return;
     }
   }else{
@@ -1577,6 +1627,25 @@ function updateHud(){
   document.getElementById('tod-label').textContent=fmtTime(simTime);
   document.getElementById('tod-fill').style.width=(simTime*100).toFixed(1)+'%';
   document.getElementById('tod-phase').textContent=todPhase(h);
+  updateStopPanel();
+}
+
+function updateStopPanel(){
+  const currentEl=document.getElementById('sr-current');
+  if(!currentEl)return;
+  currentEl.textContent=stoppedN;
+  document.getElementById('sr-no-route').textContent=stopStats.noRoute;
+  document.getElementById('sr-blocked').textContent=stopStats.blocked;
+  document.getElementById('sr-red').textContent=stopStats.redSignal;
+  document.getElementById('sr-lock').textContent=stopStats.intersectionLock;
+  document.getElementById('sr-freeze').textContent=stopStats.freezeEvents;
+}
+
+function setStopPanelVisible(visible){
+  const panel=document.getElementById('stop-panel');
+  const btn=document.getElementById('btn-stop-panel-toggle');
+  panel.classList.toggle('hidden',!visible);
+  btn.classList.toggle('on',visible);
 }
 
 // ─── INTERACTION ──────────────────────────────────────────────────────────────
@@ -1627,6 +1696,11 @@ document.getElementById('btn-zin').onclick=()=>zoomAt(canvas.width/2,canvas.heig
 document.getElementById('btn-zout').onclick=()=>zoomAt(canvas.width/2,canvas.height/2,.87);
 document.getElementById('btn-zreset').onclick=()=>resetView();
 document.getElementById('btn-regen').onclick=()=>startCity();
+document.getElementById('btn-stop-panel-toggle').onclick=()=>{
+  const panel=document.getElementById('stop-panel');
+  setStopPanelVisible(panel.classList.contains('hidden'));
+};
+document.getElementById('btn-stop-panel-close').onclick=()=>setStopPanelVisible(false);
 document.getElementById('btn-export-map').onclick=()=>exportMapToFile();
 document.getElementById('btn-import-map').onclick=()=>document.getElementById('map-file-input').click();
 document.getElementById('map-file-input').addEventListener('change',async e=>{
@@ -1738,6 +1812,7 @@ aiEl('btn-ai-train').onclick=()=>aiStartTraining();
 aiEl('btn-ai-stop').onclick=()=>aiFinishTraining(false);
 aiEl('btn-ai-apply').onclick=()=>{aiApplyLayout();};
 aiSetButtons();
+setStopPanelVisible(true);
 
 // ─── MAIN LOOP ────────────────────────────────────────────────────────────────
 function loop(ts){
