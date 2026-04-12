@@ -169,6 +169,24 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
   background:rgba(240,180,41,.1);
 }
 
+#edit-panel{
+  top:118px;left:13px;width:260px;pointer-events:auto;display:none;
+}
+#edit-panel.show{display:block}
+#edit-title{font-size:9px;letter-spacing:.12em;color:var(--accent);margin-bottom:6px}
+#edit-tip{font-size:8px;color:var(--dim);letter-spacing:.04em;margin-bottom:6px;line-height:1.4}
+.edit-group{margin-bottom:6px}
+.edit-group:last-child{margin-bottom:0}
+.edit-row{display:flex;gap:4px;flex-wrap:wrap}
+.edit-btn{
+  border:1px solid var(--border);background:transparent;color:var(--dim);
+  font-family:'DM Mono',monospace;font-size:8px;padding:3px 5px;cursor:pointer;
+}
+.edit-btn:hover{color:var(--accent);border-color:#3a4358}
+.edit-btn.on{color:var(--accent);border-color:var(--accent);background:rgba(240,180,41,.08)}
+#world-wrap.editing{cursor:crosshair}
+#world-wrap.editing.grab{cursor:grabbing}
+
 /* generation overlay */
 #gen-overlay{
   position:absolute;inset:0;background:rgba(13,15,20,.85);
@@ -213,6 +231,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <button class="hbtn" id="btn-zin">+</button>
     <button class="hbtn" id="btn-pause">Pause</button>
     <button class="hbtn" id="btn-regen">New City</button>
+    <button class="hbtn" id="btn-edit-mode">Edit</button>
     <button class="hbtn" id="btn-stop-panel-toggle">Stops</button>
     <button class="hbtn" id="btn-export-map">Export Map</button>
     <button class="hbtn" id="btn-import-map">Import Map</button>
@@ -239,6 +258,39 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <div id="ai-bar"><div id="ai-bar-fill"></div></div>
     <div id="ai-meta">Epoch 0/0 | best score n/a</div>
   </div>
+  <div class="panel" id="edit-panel">
+    <div id="edit-title">CITY EDITOR</div>
+    <div id="edit-tip">Left-drag to paint. Shift-drag pans while editing. Edits rebuild the map.</div>
+    <div class="edit-group">
+      <div class="edit-row">
+        <button class="edit-btn on" data-edit-tool="road-local">Local</button>
+        <button class="edit-btn" data-edit-tool="road-arterial">Arterial</button>
+        <button class="edit-btn" data-edit-tool="road-highway">Highway</button>
+        <button class="edit-btn" data-edit-tool="erase">Erase</button>
+      </div>
+    </div>
+    <div class="edit-group">
+      <div class="edit-row">
+        <button class="edit-btn" data-edit-tool="zone-res">Residential</button>
+        <button class="edit-btn" data-edit-tool="zone-com">Commercial</button>
+        <button class="edit-btn" data-edit-tool="zone-ind">Industrial</button>
+        <button class="edit-btn" data-edit-tool="zone-park">Park</button>
+      </div>
+    </div>
+    <div class="edit-group">
+      <div class="edit-row">
+        <button class="edit-btn" data-edit-tool="land-add">Add Land</button>
+        <button class="edit-btn" data-edit-tool="land-cut">Cut Land</button>
+      </div>
+    </div>
+    <div class="edit-group">
+      <div class="edit-row">
+        <button class="edit-btn on" data-edit-brush="1">Brush 1</button>
+        <button class="edit-btn" data-edit-brush="2">Brush 2</button>
+        <button class="edit-btn" data-edit-brush="3">Brush 3</button>
+      </div>
+    </div>
+  </div>
   <div class="panel" id="stop-panel">
     <div id="stop-panel-head">
       <div id="stop-panel-title">STOP REASONS</div>
@@ -263,7 +315,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <div class="sr-row"><span>Deadlock recoveries</span><span id="sr-m-deadlock">0</span></div>
     <div class="sr-row sr-row-hotspots"><span>Hotspots</span><span id="sr-m-hotspots">none</span></div>
   </div>
-  <div id="version-tag">V5.3</div>
+  <div id="version-tag">V6</div>
   <div class="panel" id="zoom-tip" style="bottom:13px;left:50%;transform:translateX(-50%)">Scroll · zoom &nbsp;|&nbsp; Drag · pan &nbsp;|&nbsp; New City · regenerate</div>
 </div>
 
@@ -412,7 +464,7 @@ function clone2d(arr){
 function exportMapState(){
   return {
     format: 'CityFlowMap',
-    version: 'V5.3',
+    version: 'V6',
     width: GW,
     height: GH,
     grid: clone2d(grid),
@@ -1187,6 +1239,7 @@ class Car{
     this.stuckTicks=0;
     this.ignoreMinorTicks=0;
     this.nextRerouteTick=0;
+    this.rerouteCooldown=0;
     this.reroutes=0;
     this.routeSig=routeSignature(this.path);
     this.lastRouteSig='';
@@ -1244,6 +1297,7 @@ let metricsFrozen=false;
 let fullStopStreak=0;
 const FREEZE_AFTER_FULL_STOP_TICKS=20;
 const DEADLOCK_STUCK_TICKS=16;
+const DEADLOCK_ESCAPE_STUCK_TICKS=35;
 const REROUTE_STUCK_TRIGGER=10;
 const REROUTE_COOLDOWN_MIN_TICKS=20;
 const REROUTE_COOLDOWN_MAX_TICKS=50;
@@ -1457,7 +1511,8 @@ function routeSignature(path,limit=10){
 
 function setRerouteCooldown(car){
   const span=REROUTE_COOLDOWN_MAX_TICKS-REROUTE_COOLDOWN_MIN_TICKS;
-  car.nextRerouteTick=tickN+REROUTE_COOLDOWN_MIN_TICKS+(Math.random()*(span+1)|0);
+  car.rerouteCooldown=REROUTE_COOLDOWN_MIN_TICKS+(Math.random()*(span+1)|0);
+  car.nextRerouteTick=tickN+car.rerouteCooldown;
 }
 
 function majorBlockageAhead(car,occMap){
@@ -1495,6 +1550,34 @@ function rerouteCar(car,occMap,force=false){
     car.routeSig=sig;
     car.reroutes=(car.reroutes||0)+1;
     setRerouteCooldown(car);
+    return true;
+  }
+  return false;
+}
+
+function teleportEscape(car,occMap){
+  if(!drvTilesCache)return false;
+  const candidates=[];
+  for(let dy=-10;dy<=10;dy++){
+    for(let dx=-10;dx<=10;dx++){
+      const nx=car.gx+dx,ny=car.gy+dy;
+      if(!isDrv(nx,ny)||occupied.has(oKey(nx,ny)))continue;
+      candidates.push({x:nx,y:ny,d:Math.abs(dx)+Math.abs(dy)});
+    }
+  }
+  candidates.sort((a,b)=>a.d-b.d);
+  for(const t of candidates.slice(0,8)){
+    const p=astar(t.x,t.y,car.gx,car.gy,{occMap,congestionWeight:.35,randomness:.03,ignoreMinor:true});
+    if(!p||p.length<2)continue;
+    occupied.delete(oKey(car.x,car.y));
+    car.x=t.x;car.y=t.y;
+    const lp=lanePixel(t.x,t.y,car.dx,car.dy,car.laneSlot);
+    car.rx=lp.x;car.ry=lp.y;car.trx=lp.x;car.try=lp.y;
+    car.path=p.slice(1);
+    car.stuckTicks=0;
+    setRerouteCooldown(car);
+    occupied.add(oKey(car.x,car.y));
+    deadlockRecoveriesTriggered++;
     return true;
   }
   return false;
@@ -1724,10 +1807,17 @@ function simStep(){
     c.stopped=false;
 
     if(c.ignoreMinorTicks>0)c.ignoreMinorTicks--;
+    if(c.rerouteCooldown>0)c.rerouteCooldown--;
     const isStuckForReroute=c.stuckTicks>REROUTE_STUCK_TRIGGER;
     const hasMajorBlockage=majorBlockageAhead(c,occMap);
     if((isStuckForReroute||hasMajorBlockage)&&tickN>=(c.nextRerouteTick||0)){
       rerouteCar(c,occMap,isStuckForReroute||c.stuckTicks>DEADLOCK_STUCK_TICKS);
+      c.rerouteCooldown=10+(Math.random()*15|0);
+      c.nextRerouteTick=tickN+c.rerouteCooldown;
+    }
+
+    if(c.stuckTicks>=DEADLOCK_ESCAPE_STUCK_TICKS){
+      if(teleportEscape(c,occMap))continue;
     }
 
     if(c.restartDelay>0){
@@ -1737,7 +1827,10 @@ function simStep(){
       if(c.stuckTicks>DEADLOCK_STUCK_TICKS&&tickN>=(c.nextRerouteTick||0)){
         c.ignoreMinorTicks=8;
         deadlockRecoveriesTriggered++;
-        rerouteCar(c,occMap,true);
+        if(rerouteCar(c,occMap,true)){
+          c.rerouteCooldown=8+(Math.random()*12|0);
+          c.nextRerouteTick=tickN+c.rerouteCooldown;
+        }
       }
       continue;
     }
@@ -2161,6 +2254,7 @@ function drawScene(){
   drawGround(range);
   drawBuildings(range);
   drawRoads(range);
+  drawEditorCursor();
   for(const c of cars)drawCar(c);
   drawHoveredHotspotMarker();
   drawMinimap();
@@ -2283,9 +2377,30 @@ function zoomAt(sx,sy,factor){
 
 const wrap=document.getElementById('world-wrap');
 wrap.addEventListener('wheel',e=>{e.preventDefault();zoomAt(e.offsetX,e.offsetY,e.deltaY<0?1.12:.893);},{passive:false});
-wrap.addEventListener('mousedown',e=>{if(e.button!==0)return;view.drag=true;view.dragX=e.clientX-view.panX;view.dragY=e.clientY-view.panY;wrap.classList.add('grab');});
-window.addEventListener('mousemove',e=>{if(!view.drag)return;view.panX=e.clientX-view.dragX;view.panY=e.clientY-view.dragY;});
-window.addEventListener('mouseup',()=>{view.drag=false;wrap.classList.remove('grab');});
+wrap.addEventListener('mousedown',e=>{
+  if(e.button!==0)return;
+  if(editor.enabled&&!e.shiftKey){
+    editor.drawing=true;
+    refreshEditHover(e.clientX,e.clientY);
+    paintEdit(editor.hover.x,editor.hover.y);
+    return;
+  }
+  view.drag=true;
+  view.dragX=e.clientX-view.panX;
+  view.dragY=e.clientY-view.panY;
+  wrap.classList.add('grab');
+});
+window.addEventListener('mousemove',e=>{
+  refreshEditHover(e.clientX,e.clientY);
+  if(!view.drag)return;
+  view.panX=e.clientX-view.dragX;
+  view.panY=e.clientY-view.dragY;
+});
+window.addEventListener('mouseup',()=>{
+  if(editor.drawing)finalizeEditStroke();
+  view.drag=false;
+  wrap.classList.remove('grab');
+});
 window.addEventListener('resize',()=>{resizeCanvas();resetView();});
 
 // Touch zoom
@@ -2311,6 +2426,7 @@ document.getElementById('btn-zin').onclick=()=>zoomAt(canvas.width/2,canvas.heig
 document.getElementById('btn-zout').onclick=()=>zoomAt(canvas.width/2,canvas.height/2,.87);
 document.getElementById('btn-zreset').onclick=()=>resetView();
 document.getElementById('btn-regen').onclick=()=>startCity();
+document.getElementById('btn-edit-mode').onclick=()=>setEditMode(!editor.enabled);
 document.getElementById('btn-stop-panel-toggle').onclick=()=>{
   const panel=document.getElementById('stop-panel');
   setStopPanelVisible(panel.classList.contains('hidden'));
@@ -2318,6 +2434,157 @@ document.getElementById('btn-stop-panel-toggle').onclick=()=>{
 document.getElementById('btn-stop-panel-close').onclick=()=>setStopPanelVisible(false);
 document.getElementById('btn-export-map').onclick=()=>exportMapToFile();
 document.getElementById('btn-import-map').onclick=()=>document.getElementById('map-file-input').click();
+document.querySelectorAll('[data-edit-tool]').forEach(btn=>{
+  btn.addEventListener('click',()=>setEditorTool(btn.dataset.editTool));
+});
+document.querySelectorAll('[data-edit-brush]').forEach(btn=>{
+  btn.addEventListener('click',()=>setEditorBrush(Number(btn.dataset.editBrush)));
+});
+
+const editor={
+  enabled:false,
+  drawing:false,
+  tool:'road-local',
+  brush:1,
+  hover:null,
+  lastKey:'',
+  lastCell:null,
+};
+
+function gridFromPointer(clientX,clientY){
+  const rect=wrap.getBoundingClientRect();
+  const sx=clientX-rect.left,sy=clientY-rect.top;
+  const w=toWorld(sx,sy);
+  return{x:Math.floor(w.x/CELL),y:Math.floor(w.y/CELL)};
+}
+
+function setEditMode(on){
+  editor.enabled=!!on;
+  document.getElementById('btn-edit-mode').classList.toggle('on',editor.enabled);
+  document.getElementById('edit-panel').classList.toggle('show',editor.enabled);
+  wrap.classList.toggle('editing',editor.enabled);
+}
+
+function setEditorTool(tool){
+  editor.tool=tool;
+  document.querySelectorAll('[data-edit-tool]').forEach(btn=>btn.classList.toggle('on',btn.dataset.editTool===tool));
+}
+
+function setEditorBrush(size){
+  editor.brush=clampI(size,1,3);
+  document.querySelectorAll('[data-edit-brush]').forEach(btn=>btn.classList.toggle('on',Number(btn.dataset.editBrush)===editor.brush));
+}
+
+function applyEditAt(x,y,tool){
+  if(!inB(x,y))return;
+  if(tool==='land-cut'){
+    cityMask[y][x]=false;
+    zone[y][x]=Z.NONE;
+    grid[y][x]=EMPTY;
+    dirGrid[y][x]=null;
+    interMask[y][x]=0;
+    return;
+  }
+
+  cityMask[y][x]=true;
+  if(zone[y][x]===Z.NONE)zone[y][x]=Z.RES;
+
+  if(tool==='erase'){
+    grid[y][x]=EMPTY;
+    dirGrid[y][x]=null;
+    interMask[y][x]=0;
+    return;
+  }
+  if(tool==='land-add')return;
+  if(tool==='zone-res'){zone[y][x]=Z.RES;return;}
+  if(tool==='zone-com'){zone[y][x]=Z.COM;return;}
+  if(tool==='zone-ind'){zone[y][x]=Z.IND;return;}
+  if(tool==='zone-park'){zone[y][x]=Z.PARK;return;}
+
+  let dir='h';
+  if(editor.lastCell){
+    const dx=x-editor.lastCell.x,dy=y-editor.lastCell.y;
+    if(Math.abs(dy)>Math.abs(dx))dir='v';
+  }
+  const rt=tool==='road-highway'?HIGHWAY:tool==='road-arterial'?ARTERIAL:LOCAL;
+  if(zone[y][x]===Z.PARK)zone[y][x]=Z.RES;
+  setRoad(x,y,rt,dir);
+}
+
+function paintEdit(gx,gy){
+  const r=editor.brush-1;
+  const key=`${gx}:${gy}:${editor.tool}:${editor.brush}`;
+  if(key===editor.lastKey)return;
+  editor.lastKey=key;
+  for(let oy=-r;oy<=r;oy++){
+    for(let ox=-r;ox<=r;ox++){
+      if(Math.abs(ox)+Math.abs(oy)>r)continue;
+      applyEditAt(gx+ox,gy+oy,editor.tool);
+    }
+  }
+  editor.lastCell={x:gx,y:gy};
+}
+
+function finalizeEditStroke(){
+  if(!editor.enabled)return;
+  editor.drawing=false;
+  editor.lastKey='';
+  editor.lastCell=null;
+  normaliseIntersections();
+  simReset();
+  buildDrvCache();
+  generateBuildings();
+  for(let i=0;i<20;i++)spawnCar();
+}
+
+window.cityEditor={
+  getState(){return{enabled:editor.enabled,tool:editor.tool,brush:editor.brush};},
+  setMode:on=>setEditMode(!!on),
+  setTool:tool=>setEditorTool(String(tool||'road-local')),
+  setBrush:size=>setEditorBrush(Number(size)||1),
+  applyEdits(edits=[]){
+    if(!Array.isArray(edits))return;
+    for(const e of edits){
+      if(!e||!Number.isFinite(e.x)||!Number.isFinite(e.y))continue;
+      const oldTool=editor.tool,oldBrush=editor.brush;
+      if(e.tool)setEditorTool(String(e.tool));
+      if(e.brush)setEditorBrush(Number(e.brush));
+      paintEdit(clampI(e.x,0,GW-1),clampI(e.y,0,GH-1));
+      setEditorTool(oldTool);
+      setEditorBrush(oldBrush);
+    }
+    finalizeEditStroke();
+  },
+};
+
+function drawEditorCursor(){
+  if(!editor.enabled||!editor.hover||view.drag)return;
+  const x=editor.hover.x,y=editor.hover.y;
+  if(!inB(x,y))return;
+  const r=editor.brush-1;
+  ctx.save();
+  ctx.fillStyle='rgba(240,180,41,.11)';
+  ctx.strokeStyle='rgba(240,180,41,.85)';
+  ctx.lineWidth=1;
+  for(let oy=-r;oy<=r;oy++){
+    for(let ox=-r;ox<=r;ox++){
+      if(Math.abs(ox)+Math.abs(oy)>r)continue;
+      const nx=x+ox,ny=y+oy;
+      if(!inB(nx,ny))continue;
+      const sx=nx*CELL*view.zoom+view.panX;
+      const sy=ny*CELL*view.zoom+view.panY;
+      const cs=CELL*view.zoom;
+      ctx.fillRect(sx,sy,cs,cs);
+      ctx.strokeRect(sx+.5,sy+.5,cs-1,cs-1);
+    }
+  }
+  ctx.restore();
+}
+
+function refreshEditHover(clientX,clientY){
+  editor.hover=gridFromPointer(clientX,clientY);
+  if(editor.enabled&&editor.drawing&&!view.drag)paintEdit(editor.hover.x,editor.hover.y);
+}
 const hotspotList=document.getElementById('sr-m-hotspots');
 hotspotList.addEventListener('mouseover',e=>{
   const chip=e.target.closest('.hotspot-chip');

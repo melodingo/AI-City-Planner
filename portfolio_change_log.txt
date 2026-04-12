@@ -6,6 +6,13 @@ city simulation so it can be reused later for portfolio documentation.
 
 Major Versions
 
+7. V6 - editor and traffic AI upgrades (Apr 2026)
+  - Added an in-app city editor with paint tools for roads, zoning, and land edits.
+  - Exposed a `window.cityEditor` API for future scripted/AI-driven city changes.
+  - Merged stronger car recovery behavior: reroute cooldowns, staggered retries, and deadlock escape.
+  - Reworked road generation into a cleaner layered pipeline and increased city-shape variation.
+  - Updated version label/export metadata to `V6` and generated the `version-6.png` release screenshot.
+
 1. 7be5ade - initial browser city
    - First working browser build of the city generator and traffic simulation.
    - Established the basic visual style, road network, and moving cars.
@@ -74,6 +81,7 @@ Screenshot Assets
 - version_screenshots/3.3.png
 - version_screenshots/4.0.png
 - version_screenshots/5.0.png
+- version-6.png
 
 Notes for later portfolio writing
 

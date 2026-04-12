@@ -16,6 +16,16 @@ A simulation where an AI redesigns a city to reduce congestion, with before/afte
 
 ## Current Implementation
 
+## Latest Browser Release (V6)
+
+The browser simulator has been upgraded to `V6` with a major systems pass.
+
+- Rebuilt road generation pipeline (highways, arterials, locals) for more believable layouts.
+- Randomized city boundary shape so each run has a more distinct footprint.
+- Added in-app city editing tools plus `window.cityEditor` hooks for future AI-driven edits.
+- Improved car recovery behavior with reroute cooldowns and deadlock escape logic.
+- Expanded simulator controls/panels and updated export metadata to version `V6`.
+
 ### Browser simulation
 - `city_visual.html`
 - Procedural city generation + live traffic rendering and controls.
@@ -56,6 +66,12 @@ python main.py --mode visual
 python main.py --mode headless
 python main.py --mode envtest
 ```
+
+Browser mode:
+
+Open `city_visual.html` in a browser to use the interactive city generator/editor.
+
+Latest release screenshot: `version-6.png`.
 
 ## Optimization Output
 
