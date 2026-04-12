@@ -1160,8 +1160,8 @@ function lanePixel(gx,gy,dx,dy,laneSlot){
   else{off=3;}
   if(dx>0)return{x:cx,y:cy+off};   // eastbound → lower lane
   if(dx<0)return{x:cx,y:cy-off};   // westbound → upper lane
-  if(dy>0)return{x:cx+off,y:cy};   // southbound → right lane
-  if(dy<0)return{x:cx-off,y:cy};   // northbound → left lane
+  if(dy>0)return{x:cx-off,y:cy};   // southbound → right-hand side (west)
+  if(dy<0)return{x:cx+off,y:cy};   // northbound → right-hand side (east)
   return{x:cx,y:cy};
 }
 
@@ -1186,11 +1186,14 @@ class Car{
     this.restartDelay=0;
     this.stuckTicks=0;
     this.ignoreMinorTicks=0;
-    this.rerouteTimer=10+(Math.random()*20|0);
+    this.nextRerouteTick=0;
     this.reroutes=0;
+    this.routeSig=routeSignature(this.path);
+    this.lastRouteSig='';
     this.interWaitTicksTotal=0;
     this.interWaitEvents=0;
     this.currentInterWait=0;
+    setRerouteCooldown(this);
     // District origin for metrics
     this.originZone=zone[y][x];
   }
@@ -1211,8 +1214,8 @@ class Car{
     this.stuckTicks=0;
     this.restartDelay=0;
   }
-  tickStop(atIntersection=false){
-    if(this.speed===1&&this.restartDelay===0)this.restartDelay=1+(Math.random()<.35?1:0);
+  tickStop(atIntersection=false,applyRestartDelay=true){
+    if(applyRestartDelay&&this.speed===1&&this.restartDelay===0)this.restartDelay=1+(Math.random()<.35?1:0);
     this.speed=0;
     this.stopped=true;
     this.travel++;
@@ -1241,12 +1244,17 @@ let metricsFrozen=false;
 let fullStopStreak=0;
 const FREEZE_AFTER_FULL_STOP_TICKS=20;
 const DEADLOCK_STUCK_TICKS=16;
-const REROUTE_CONGESTION_THRESHOLD=1.45;
-const REROUTE_MIN_TICKS=14;
-const REROUTE_MAX_TICKS=32;
+const REROUTE_STUCK_TRIGGER=10;
+const REROUTE_COOLDOWN_MIN_TICKS=20;
+const REROUTE_COOLDOWN_MAX_TICKS=50;
+const REROUTE_MAJOR_BLOCKAGE_THRESHOLD=2.6;
+const REROUTE_MAJOR_BLOCKED_STEPS=2;
+const REROUTE_LOOKAHEAD_STEPS=5;
 const CONGESTION_TILE_THRESHOLD=1.25;
 const HOTSPOT_LIMIT=4;
 const THROUGHPUT_WINDOW_TICKS=120;
+const SIGNAL_MIN_GREEN=8;
+const SIGNAL_MAX_GREEN=20;
 const stopStats={
   noRoute:0,
   blocked:0,
@@ -1421,7 +1429,7 @@ function buildOccMap(){
 
 function pathCongestionAhead(car,occMap){
   if(!car.path||!car.path.length)return 0;
-  const n=Math.min(6,car.path.length);
+  const n=Math.min(REROUTE_LOOKAHEAD_STEPS,car.path.length);
   let total=0;
   for(let i=0;i<n;i++){
     const p=car.path[i];
@@ -1430,21 +1438,51 @@ function pathCongestionAhead(car,occMap){
   return total/n;
 }
 
+function routeSignature(path,limit=10){
+  if(!path||!path.length)return'';
+  return path.slice(0,limit).map(p=>`${p.x},${p.y}`).join('|');
+}
+
+function setRerouteCooldown(car){
+  const span=REROUTE_COOLDOWN_MAX_TICKS-REROUTE_COOLDOWN_MIN_TICKS;
+  car.nextRerouteTick=tickN+REROUTE_COOLDOWN_MIN_TICKS+(Math.random()*(span+1)|0);
+}
+
+function majorBlockageAhead(car,occMap){
+  if(!car.path||!car.path.length)return false;
+  const n=Math.min(REROUTE_LOOKAHEAD_STEPS,car.path.length);
+  let blockedSteps=0;
+  for(let i=0;i<n;i++){
+    const p=car.path[i];
+    if((occMap.get(oKey(p.x,p.y))||0)>0.9)blockedSteps++;
+  }
+  if(blockedSteps>=REROUTE_MAJOR_BLOCKED_STEPS)return true;
+  return pathCongestionAhead(car,occMap)>=REROUTE_MAJOR_BLOCKAGE_THRESHOLD;
+}
+
 function rerouteCar(car,occMap,force=false){
+  if(!force&&tickN<(car.nextRerouteTick||0))return false;
   const opts={
     occMap,
-    congestionWeight:1.35,
-    randomness:0.35,
+    congestionWeight:0.55,
+    randomness:0.06,
     ignoreMinor:car.ignoreMinorTicks>0,
   };
   if(force){
-    opts.congestionWeight=1.8;
-    opts.randomness=.55;
+    opts.congestionWeight=.85;
+    opts.randomness=.1;
   }
   const p=astar(car.x,car.y,car.gx,car.gy,opts);
   if(p&&p.length>1){
-    car.path=p.slice(1);
+    const nextPath=p.slice(1);
+    const sig=routeSignature(nextPath);
+    const currentSig=routeSignature(car.path);
+    if(!force&&(sig===currentSig||sig===car.lastRouteSig))return false;
+    car.lastRouteSig=currentSig;
+    car.path=nextPath;
+    car.routeSig=sig;
     car.reroutes=(car.reroutes||0)+1;
+    setRerouteCooldown(car);
     return true;
   }
   return false;
@@ -1471,6 +1509,8 @@ function simReset(){
   drvTilesCache=null;
   metricsFrozen=false;
   fullStopStreak=0;
+  signalDemandH.clear();
+  signalDemandV.clear();
   resetStopStats();
   resetTrafficMetrics();
 }
@@ -1527,7 +1567,7 @@ function spawnCar(){
     const d=dstPool[Math.random()*dstPool.length|0];
     if(s.x===d.x&&s.y===d.y)continue;
     if(occupied.has(oKey(s.x,s.y)))continue;
-    const path=astar(s.x,s.y,d.x,d.y,{occMap:buildOccMap(),congestionWeight:1.2,randomness:.25});
+    const path=astar(s.x,s.y,d.x,d.y,{occMap:buildOccMap(),congestionWeight:.45,randomness:.05});
     if(!path||path.length<2)continue;
     const c=new Car(s.x,s.y,d.x,d.y,path);
     cars.push(c);occupied.add(oKey(s.x,s.y));return;
@@ -1538,7 +1578,14 @@ function spawnCar(){
 // Each intersection gets a phase (0 or 1) and a timer
 const signalPhase=new Map();
 const signalTimer=new Map();
+const signalDemandH=new Map();
+const signalDemandV=new Map();
 const SIGNAL_CYCLE=18; // ticks per phase
+
+function noteSignalDemand(k,dx){
+  const target=dx!==0?signalDemandH:signalDemandV;
+  target.set(k,(target.get(k)||0)+1);
+}
 
 function updateSignals(){
   // Only large intersections (HIGHWAY or ARTERIAL) have signals
@@ -1548,8 +1595,23 @@ function updateSignals(){
       const m=interMask[y][x]||0;
       if(!(m&BIT[HIGHWAY])&&!(m&BIT[ARTERIAL]))continue;
       const k=oKey(x,y);
+      let phase=signalPhase.get(k)||0;
       let timer=(signalTimer.get(k)||0)+1;
-      if(timer>=SIGNAL_CYCLE){timer=0;signalPhase.set(k,(signalPhase.get(k)||0)^1);}
+      const dh=signalDemandH.get(k)||0;
+      const dv=signalDemandV.get(k)||0;
+      const greenDemand=phase===0?dh:dv;
+      const redDemand=phase===0?dv:dh;
+      let flip=false;
+      if(timer>=SIGNAL_MAX_GREEN)flip=true;
+      else if(timer>=SIGNAL_MIN_GREEN){
+        if(redDemand>greenDemand+1)flip=true;
+        else if(greenDemand===0&&redDemand>0)flip=true;
+      }
+      if(flip){
+        timer=0;
+        phase^=1;
+      }
+      signalPhase.set(k,phase);
       signalTimer.set(k,timer);
     }
   }
@@ -1572,8 +1634,12 @@ function simStep(){
   // Advance time of day
   simTime=(simTime+1/SIM_DAY)%1;
   updateSignals();
+  signalDemandH.clear();
+  signalDemandV.clear();
   interLocks.clear();stoppedN=0;
   const occMap=buildOccMap();
+  const carByPos=new Map();
+  for(const c of cars)carByPos.set(oKey(c.x,c.y),c);
   const activeIds=new Set(cars.map(c=>c.id));
   for(const[k,v]of interLocks.entries())if(!activeIds.has(v))interLocks.delete(k);
   for(const[k,q]of interQueues.entries()){
@@ -1582,26 +1648,32 @@ function simStep(){
   }
   const interPassAxis=new Map();
   const interPassCount=new Map();
+  const movedThisTick=new Set();
   let arrivalsThisTick=0;
-  // Shuffle for fairness
-  for(let i=cars.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[cars[i],cars[j]]=[cars[j],cars[i]];}
+  // Priority: cars stopped longer are evaluated first to reduce stalemates.
+  const driveOrder=[...cars].sort((a,b)=>{
+    const pa=b.stuckTicks*3+b.currentInterWait;
+    const pb=a.stuckTicks*3+a.currentInterWait;
+    if(pa!==pb)return pa-pb;
+    return Math.random()-.5;
+  });
 
-  for(const c of cars){
+  for(const c of driveOrder){
+    if(movedThisTick.has(c.id))continue;
     c.stopped=false;
 
     if(c.ignoreMinorTicks>0)c.ignoreMinorTicks--;
-    c.rerouteTimer--;
-    if(c.rerouteTimer<=0){
-      const pressure=pathCongestionAhead(c,occMap);
-      if(pressure>REROUTE_CONGESTION_THRESHOLD||Math.random()<.08)rerouteCar(c,occMap,pressure>REROUTE_CONGESTION_THRESHOLD);
-      c.rerouteTimer=REROUTE_MIN_TICKS+(Math.random()*(REROUTE_MAX_TICKS-REROUTE_MIN_TICKS)|0);
+    const isStuckForReroute=c.stuckTicks>REROUTE_STUCK_TRIGGER;
+    const hasMajorBlockage=majorBlockageAhead(c,occMap);
+    if((isStuckForReroute||hasMajorBlockage)&&tickN>=(c.nextRerouteTick||0)){
+      rerouteCar(c,occMap,isStuckForReroute||c.stuckTicks>DEADLOCK_STUCK_TICKS);
     }
 
     if(c.restartDelay>0){
       c.restartDelay--;
       c.tickStop();
       stoppedN++;
-      if(c.stuckTicks>DEADLOCK_STUCK_TICKS){
+      if(c.stuckTicks>DEADLOCK_STUCK_TICKS&&tickN>=(c.nextRerouteTick||0)){
         c.ignoreMinorTicks=8;
         deadlockRecoveriesTriggered++;
         rerouteCar(c,occMap,true);
@@ -1611,40 +1683,74 @@ function simStep(){
 
     let nxt=c.nextStep();
     if(!nxt){
-      if(!c.arrived){const p=astar(c.x,c.y,c.gx,c.gy,{occMap,congestionWeight:1.4,randomness:.35,ignoreMinor:c.ignoreMinorTicks>0});if(p&&p.length>1){c.path=p.slice(1);nxt=c.nextStep();}}
+      if(!c.arrived){
+        const p=astar(c.x,c.y,c.gx,c.gy,{occMap,congestionWeight:.6,randomness:.08,ignoreMinor:c.ignoreMinorTicks>0});
+        if(p&&p.length>1){
+          c.lastRouteSig=routeSignature(c.path);
+          c.path=p.slice(1);
+          c.routeSig=routeSignature(c.path);
+          setRerouteCooldown(c);
+          nxt=c.nextStep();
+        }
+      }
       if(!nxt){c.tickStop();recordStop('noRoute');continue;}
     }
     const nk=oKey(nxt.x,nxt.y);
-    if(occupied.has(nk)){c.tickStop();recordStop('blocked');continue;}
+    if(occupied.has(nk)){
+      const other=carByPos.get(nk);
+      const otherNxt=other&&other.nextStep?other.nextStep():null;
+      const straightMove=(nxt.dx===0)!==(nxt.dy===0);
+      const oppositeDir=otherNxt&&(nxt.dx===-otherNxt.dx&&nxt.dy===-otherNxt.dy);
+      const wantsSwap=otherNxt&&otherNxt.x===c.x&&otherNxt.y===c.y;
+      const noIntersections=grid[c.y][c.x]!==INTER&&grid[nxt.y][nxt.x]!==INTER;
+      const canSwap=other&&other.id!==c.id&&other.restartDelay===0&&straightMove&&oppositeDir&&wantsSwap&&noIntersections;
+      if(canSwap){
+        const cOldK=oKey(c.x,c.y),oOldK=oKey(other.x,other.y);
+        occupied.delete(cOldK);occupied.delete(oOldK);
+        carByPos.delete(cOldK);carByPos.delete(oOldK);
+
+        c.advance();
+        other.advance();
+
+        const cNewK=oKey(c.x,c.y),oNewK=oKey(other.x,other.y);
+        occupied.add(cNewK);occupied.add(oNewK);
+        carByPos.set(cNewK,c);carByPos.set(oNewK,other);
+        movedThisTick.add(c.id);movedThisTick.add(other.id);
+        continue;
+      }
+      c.tickStop();recordStop('blocked');continue;
+    }
     if(grid[nxt.y][nxt.x]===INTER){
-      if(!signalAllows(nxt.x,nxt.y,nxt.dx,nxt.dy)){c.tickStop(true);recordStop('redSignal');continue;}
+      if(!signalAllows(nxt.x,nxt.y,nxt.dx,nxt.dy)){
+        noteSignalDemand(nk,nxt.dx);
+        c.tickStop(true,false);
+        recordStop('redSignal');
+        continue;
+      }
       const q=interQueues.get(nk)||[];
       if(!q.includes(c.id))q.push(c.id);
       interQueues.set(nk,q);
-      if(q[0]!==c.id){c.tickStop(true);recordStop('intersectionLock');continue;}
+      if(q[0]!==c.id){c.tickStop(true,false);recordStop('intersectionLock');continue;}
 
       const axis=nxt.dx!==0?'h':'v';
       const usedAxis=interPassAxis.get(nk);
       const passCount=interPassCount.get(nk)||0;
       const axisCompatible=(passCount===0)||(usedAxis===axis&&passCount<2);
-      if(!axisCompatible){c.tickStop(true);recordStop('intersectionLock');continue;}
+      if(!axisCompatible){c.tickStop(true,false);recordStop('intersectionLock');continue;}
 
       q.shift();
       if(q.length===0)interQueues.delete(nk);else interQueues.set(nk,q);
       interPassAxis.set(nk,axis);
       interPassCount.set(nk,passCount+1);
     }
-    occupied.delete(oKey(c.x,c.y));
+    const oldK=oKey(c.x,c.y);
+    occupied.delete(oldK);
+    carByPos.delete(oldK);
     c.advance();
-    occupied.add(oKey(c.x,c.y));
-  }
-
-  for(const c of cars){
-    if(c.stuckTicks>DEADLOCK_STUCK_TICKS&&c.restartDelay===0){
-      c.ignoreMinorTicks=8;
-      deadlockRecoveriesTriggered++;
-      rerouteCar(c,occMap,true);
-    }
+    const newK=oKey(c.x,c.y);
+    occupied.add(newK);
+    carByPos.set(newK,c);
+    movedThisTick.add(c.id);
   }
 
   cars=cars.filter(c=>{
