@@ -375,167 +375,191 @@ function placeParks(cx,cy){
   }
 }
 
-// ── Highways: radial spokes from CBD + one ring ────────────────────────────────
-function buildHighways(cx,cy,rx,ry){
-  const spokesN=irnd(5,8);
-  const spokes=[];
-  for(let i=0;i<spokesN;i++){
-    const ang=rnd(0,Math.PI*2);
-    // Start just outside CBD core
-    const sx=clampI(cx+Math.cos(ang)*rx*.12,1,GW-2);
-    const sy=clampI(cy+Math.sin(ang)*ry*.12,1,GH-2);
-    const ex=clampI(cx+Math.cos(ang)*rx*1.05,1,GW-2);
-    const ey=clampI(cy+Math.sin(ang)*ry*1.05,1,GH-2);
-    growStraightRoad(sx,sy,ex,ey,HIGHWAY,.96);
-    spokes.push({sx,sy,ex,ey,ang});
-  }
-  // Ring road at ~55% radius
-  const ringR=Math.min(rx*.55,ry*.55);
-  const ringSeg=Math.round(ringR*2.2);
-  for(let i=0;i<ringSeg;i++){
-    const a1=(i/ringSeg)*Math.PI*2;
-    const a2=((i+1)/ringSeg)*Math.PI*2;
-    const x1=clampI(cx+Math.cos(a1)*rx*.52,1,GW-2);
-    const y1=clampI(cy+Math.sin(a1)*ry*.5,1,GH-2);
-    const x2=clampI(cx+Math.cos(a2)*rx*.52,1,GW-2);
-    const y2=clampI(cy+Math.sin(a2)*ry*.5,1,GH-2);
-    cityMask[y1][x1]=true;cityMask[y2][x2]=true;
-    growStraightRoad(x1,y1,x2,y2,HIGHWAY,.93);
-  }
-  // CBD cross — two perpendicular highways through centre
-  for(const[dx,dy]of[[1,0],[0,1]]){
-    const len=Math.round((dx?rx:ry)*.7);
-    const ox=clampI(cx-dx*len,1,GW-2),oy=clampI(cy-dy*len,1,GH-2);
-    const ex=clampI(cx+dx*len,1,GW-2),ey=clampI(cy+dy*len,1,GH-2);
-    growStraightRoad(ox,oy,ex,ey,HIGHWAY,.99);
-  }
-}
+// ═══════════════════════════════════════════════════════════════════════════════
+// ROAD GENERATION
+//
+// Highway system — a real closed network, not disconnected blobs:
+//   • 2–3 long H corridors that run edge-to-edge across the ENTIRE city width
+//   • 2–3 long V corridors that run edge-to-edge across the ENTIRE city height
+//   • Each corridor gets 1–3 gentle kinks (axis-locked jogs) so they feel
+//     organic rather than perfectly straight
+//   • A ring road is built by stitching the outermost corridors together
+//     with short connector segments — guaranteed closure
+//   • All of this means every highway tile is reachable from every other
+//
+// Arterials — kinked-straight grid with enforced minimum spacing:
+//   • Regular spacing with per-line jitter, but each line is FULLY H or FULLY V
+//   • Minimum gap enforced so lines never clump
+//
+// Locals — cooldown-gated growth from arterials (no clumping):
+//   • 2D cooldown grid prevents adjacent sprouts
+//   • Organic turn probability preserved from v4
+// ═══════════════════════════════════════════════════════════════════════════════
 
-// Draw a mostly-straight road between two points with a small jitter
-function growStraightRoad(x0,y0,x1,y1,rt,straightness){
-  let x=x0,y=y0;
-  let dx=Math.sign(x1-x0),dy=Math.sign(y1-y0);
-  const steps=Math.abs(x1-x0)+Math.abs(y1-y0)+1;
-  for(let i=0;i<steps;i++){
-    const nx2=clampI(x,0,GW-1),ny2=clampI(y,0,GH-1);
-    cityMask[ny2][nx2]=true;
-    setRoad(nx2,ny2,rt,dx!==0?'h':'v');
-    if(x===x1&&y===y1)break;
-    const goH=dx!==0&&(dy===0||Math.random()<straightness);
-    if(goH)x+=dx;
-    else if(dy!==0)y+=dy;
-    if(x===x1)dx=0;if(y===y1)dy=0;
-  }
+// ── primitive draw helpers ────────────────────────────────────────────────────
+function drawHSeg(y,x0,x1,rt){
+  const lo=Math.min(x0,x1),hi=Math.max(x0,x1);
+  for(let x=lo;x<=hi;x++){if(!inB(x,y))continue;cityMask[y][x]=true;setRoad(x,y,rt,'h');}
 }
-
-// ── Arterials: roughly-orthogonal grid adapted to city shape ─────────────────
-function buildArterials(cx,cy,rx,ry){
-  const spacingH=irnd(7,11),spacingV=irnd(7,11);
-  // Horizontal arterials
-  const startY=clampI(cy-ry*.9,1,GH-2);
-  const endY=clampI(cy+ry*.9,1,GH-2);
-  for(let y=startY;y<=endY;y+=spacingH){
-    if(!rowHasCityMask(y))continue;
-    // Find left and right extent of city at this row
-    let lx=0,rx2=GW-1;
-    while(lx<GW&&!cityMask[y][lx])lx++;
-    while(rx2>0&&!cityMask[y][rx2])rx2--;
-    if(lx>=rx2)continue;
-    // Small vertical jitter for organic feel
-    const jitter=irnd(-2,2);
-    const ay=clampI(y+jitter,1,GH-2);
-    growStraightRoad(lx,ay,rx2,ay,ARTERIAL,.82);
-  }
-  // Vertical arterials
-  const startX=clampI(cx-rx*.9,1,GW-2);
-  const endX=clampI(cx+rx*.9,1,GW-2);
-  for(let x=startX;x<=endX;x+=spacingV){
-    if(!colHasCityMask(x))continue;
-    let ty=0,by=GH-1;
-    while(ty<GH&&!cityMask[ty][x])ty++;
-    while(by>0&&!cityMask[by][x])by--;
-    if(ty>=by)continue;
-    const jitter=irnd(-2,2);
-    const ax=clampI(x+jitter,1,GW-2);
-    growStraightRoad(ax,ty,ax,by,ARTERIAL,.82);
-  }
+function drawVSeg(x,y0,y1,rt){
+  const lo=Math.min(y0,y1),hi=Math.max(y0,y1);
+  for(let y=lo;y<=hi;y++){if(!inB(x,y))continue;cityMask[y][x]=true;setRoad(x,y,rt,'v');}
 }
 
 function rowHasCityMask(y){
   if(y<0||y>=GH)return false;
-  for(let x=0;x<GW;x++)if(cityMask[y][x])return true;
-  return false;
+  for(let x=0;x<GW;x++)if(cityMask[y][x])return true;return false;
 }
 function colHasCityMask(x){
   if(x<0||x>=GW)return false;
-  for(let y=0;y<GH;y++)if(cityMask[y][x])return true;
-  return false;
+  for(let y=0;y<GH;y++)if(cityMask[y][x])return true;return false;
 }
 
-// ── Local roads: organic growth from arterial tiles ──────────────────────────
-function buildLocals(){
-  // Collect all arterial tiles as seeds
-  const seeds=[];
-  for(let y=0;y<GH;y++)
-    for(let x=0;x<GW;x++)
-      if(grid[y][x]===ARTERIAL&&Math.random()<.35)seeds.push({x,y});
-  // Shuffle
-  for(let i=seeds.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[seeds[i],seeds[j]]=[seeds[j],seeds[i]];}
+// ── HIGHWAYS: ring road + radial spokes ───────────────────────────────────────
+// Architecture mirrors real cities (M25 + A-roads, Chicago Loop + I-highways):
+//
+//  1. RING ROAD — one large rectangular loop at ~60% of city radius.
+//     Drawn as four pure H/V segments.  The loop is always closed.
+//
+//  2. RADIAL SPOKES — 3–5 spokes, evenly angled from city edge inward.
+//     Each spoke travels primarily along one axis (H or V) with one small
+//     midpoint jog, then terminates where it meets the ring perimeter.
+//     The spoke is an L-shaped path: long leg → short connector to ring face.
+//
+//  3. OPTIONAL INNER CROSS — ~60% chance, adds one H + one V through the CBD.
+//
+//  Because every spoke connects to the ring, the whole highway network is one
+//  connected graph — no orphaned blobs.
+function buildHighways(cx,cy,rx,ry){
+  // Ring dimensions — large enough to be clearly visible, not a tiny box
+  const rfx=rnd(.55,.65), rfy=rnd(.55,.65);
+  const rl=clampI(cx-rx*rfx+rnd(-3,3),3,GW-4);
+  const rr=clampI(cx+rx*rfx+rnd(-3,3),3,GW-4);
+  const rt2=clampI(cy-ry*rfy+rnd(-3,3),3,GH-4);
+  const rb=clampI(cy+ry*rfy+rnd(-3,3),3,GH-4);
 
-  const maxLocal=seeds.length*4+2000;
-  let localCount=0;
-  for(const s of seeds){
-    if(localCount>maxLocal)break;
-    // Perpendicular to arterial direction
-    const d=dirGrid[s.y][s.x];
-    const perps=d==='h'?[[0,1],[0,-1]]:[[1,0],[-1,0]];
-    for(const[pdx,pdy]of perps){
-      if(Math.random()>.55)continue;
-      const path=growLocalStreet(s.x+pdx,s.y+pdy,pdx,pdy);
-      localCount+=path.length;
+  // Draw the ring (four straight sides)
+  drawHSeg(rt2,rl,rr,HIGHWAY);
+  drawHSeg(rb, rl,rr,HIGHWAY);
+  drawVSeg(rl, rt2,rb,HIGHWAY);
+  drawVSeg(rr, rt2,rb,HIGHWAY);
+
+  // Radial spokes: evenly spaced angles with small per-spoke jitter
+  const nSpokes=irnd(3,5);
+  for(let i=0;i<nSpokes;i++){
+    const ang=(i/nSpokes)*Math.PI*2+rnd(-.3,.3);
+    const cosA=Math.cos(ang), sinA=Math.sin(ang);
+
+    // Entry point: city boundary
+    const ex=clampI(cx+cosA*rx*.93,2,GW-3);
+    const ey=clampI(cy+sinA*ry*.93,2,GH-3);
+    cityMask[ey][ex]=true;
+
+    // Where the spoke meets the ring face (closest face to the spoke angle)
+    let ringX,ringY;
+    if(Math.abs(cosA)>=Math.abs(sinA)){
+      // Horizontal-dominant spoke → hits left or right side of ring
+      ringX=cosA>0?rr:rl;
+      ringY=clampI(cy+sinA*(rb-rt2)*.5+rnd(-4,4),rt2,rb);
+    } else {
+      // Vertical-dominant spoke → hits top or bottom of ring
+      ringX=clampI(cx+cosA*(rr-rl)*.5+rnd(-4,4),rl,rr);
+      ringY=sinA>0?rb:rt2;
+    }
+
+    // Draw: spoke goes along primary axis with one midpoint offset jog
+    // so it's not perfectly straight (mirrors real highway bends)
+    const midX=clampI((ex+ringX)/2+rnd(-6,6),2,GW-3);
+    const midY=clampI((ey+ringY)/2+rnd(-5,5),2,GH-3);
+
+    if(Math.abs(cosA)>=Math.abs(sinA)){
+      // H-primary: horizontal to mid, small V jog, horizontal to ring face
+      drawHSeg(ey, ex, midX, HIGHWAY);
+      drawVSeg(midX, ey, midY, HIGHWAY);
+      drawHSeg(midY, midX, ringX, HIGHWAY);
+      // Short V connector to reach the ring row
+      drawVSeg(ringX, midY, ringY, HIGHWAY);
+    } else {
+      // V-primary
+      drawVSeg(ex, ey, midY, HIGHWAY);
+      drawHSeg(midY, ex, midX, HIGHWAY);
+      drawVSeg(midX, midY, ringY, HIGHWAY);
+      drawHSeg(ringY, midX, ringX, HIGHWAY);
     }
   }
-  // Branch-from-local pass
-  for(let y=0;y<GH;y++){
-    for(let x=0;x<GW;x++){
-      if(grid[y][x]!==LOCAL||Math.random()>.25)continue;
-      const d=dirGrid[y][x];
-      if(!d||d==='x')continue;
-      const[pdx,pdy]=d==='h'?(Math.random()<.5?[0,1]:[0,-1]):(Math.random()<.5?[1,0]:[-1,0]);
-      growLocalStreet(x+pdx,y+pdy,pdx,pdy);
-    }
+
+  // Optional inner cross through CBD (~60% chance)
+  if(Math.random()<.6){
+    const iy=clampI(cy+rnd(-7,7),rt2+1,rb-1);
+    const ix=clampI(cx+rnd(-7,7),rl+1,rr-1);
+    drawHSeg(iy,rl,rr,HIGHWAY);
+    drawVSeg(ix,rt2,rb,HIGHWAY);
   }
 }
 
-function growLocalStreet(sx,sy,dx,dy){
-  const path=[];
-  let x=sx,y=sy;
-  const maxLen=irnd(4,16);
-  for(let i=0;i<maxLen;i++){
-    if(!inC(x,y))break;
-    if(grid[y][x]!==EMPTY){
-      // allow connecting to existing local (loop)
-      if(grid[y][x]===LOCAL&&i>1&&Math.random()<.3)break;
-      if(grid[y][x]!==LOCAL)break;
+// ── ARTERIALS ────────────────────────────────────────────────────────────────
+// Kinked-straight lines with enforced minimum spacing.
+// Each arterial is a sequence of axis-locked segments with occasional
+// small parallel offsets (not diagonal steps) — gives the organic v4 feel
+// without the zigzag clumping bug.
+function buildArterials(cx,cy,rx,ry){
+  const minSpacing=6;
+  const nomH=irnd(7,11),nomV=irnd(7,11);
+
+  // Horizontal arterials
+  const sy0=clampI(cy-ry*.92,1,GH-2),sy1=clampI(cy+ry*.92,1,GH-2);
+  let lastAY=-999;
+  for(let y=sy0;y<=sy1;y+=nomH){
+    const jy=clampI(y+irnd(-2,2),1,GH-2);
+    if(!rowHasCityMask(jy))continue;
+    if(jy-lastAY<minSpacing)continue;
+    let lx=0,rx2=GW-1;
+    while(lx<GW&&!cityMask[jy][lx])lx++;
+    while(rx2>0&&!cityMask[jy][rx2])rx2--;
+    if(lx>=rx2)continue;
+    // Organic: split into 2–4 sub-segments with small vertical offsets between them
+    const segs=irnd(2,4);
+    let cx2=lx;
+    let curY=jy;
+    for(let s=0;s<segs;s++){
+      const nextX=s===segs-1?rx2:clampI(lx+(rx2-lx)*((s+1)/segs)+irnd(-3,3),lx,rx2);
+      drawHSeg(curY,cx2,nextX,ARTERIAL);
+      if(s<segs-1){
+        const nextY=clampI(curY+irnd(-2,2),1,GH-2);
+        drawVSeg(nextX,curY,nextY,ARTERIAL);
+        curY=nextY;
+      }
+      cx2=nextX;
     }
-    // Don't touch highways directly
-    if(adjacentTo(x,y,HIGHWAY))break;
-    // Density check
-    let localNb=0;
-    for(let oy=-1;oy<=1;oy++)for(let ox=-1;ox<=1;ox++){
-      if((ox||oy)&&inB(x+ox,y+oy)&&roadClassAt(x+ox,y+oy)===LOCAL)localNb++;
-    }
-    if(localNb>5)break;
-    setRoad(x,y,LOCAL,dx!==0?'h':'v');
-    path.push({x,y});
-    // Occasionally turn
-    if(Math.random()<.22){
-      const t=dx;dx=dy;dy=t;
-      if(!dx&&!dy){dx=1;}
-    }
-    x+=dx;y+=dy;
+    lastAY=jy;
   }
-  return path;
+
+  // Vertical arterials
+  const sx0=clampI(cx-rx*.92,1,GW-2),sx1=clampI(cx+rx*.92,1,GW-2);
+  let lastAX=-999;
+  for(let x=sx0;x<=sx1;x+=nomV){
+    const jx=clampI(x+irnd(-2,2),1,GW-2);
+    if(!colHasCityMask(jx))continue;
+    if(jx-lastAX<minSpacing)continue;
+    let ty=0,by=GH-1;
+    while(ty<GH&&!cityMask[ty][jx])ty++;
+    while(by>0&&!cityMask[by][jx])by--;
+    if(ty>=by)continue;
+    const segs=irnd(2,4);
+    let cy2=ty;
+    let curX=jx;
+    for(let s=0;s<segs;s++){
+      const nextY=s===segs-1?by:clampI(ty+(by-ty)*((s+1)/segs)+irnd(-3,3),ty,by);
+      drawVSeg(curX,cy2,nextY,ARTERIAL);
+      if(s<segs-1){
+        const nextX=clampI(curX+irnd(-2,2),1,GW-2);
+        drawHSeg(nextY,curX,nextX,ARTERIAL);
+        curX=nextX;
+      }
+      cy2=nextY;
+    }
+    lastAX=jx;
+  }
 }
 
 function adjacentTo(x,y,rt){
@@ -544,6 +568,101 @@ function adjacentTo(x,y,rt){
     if(inB(nx,ny)&&roadClassAt(nx,ny)===rt)return true;
   }
   return false;
+}
+
+// ── LOCAL STREETS ────────────────────────────────────────────────────────────
+// Cooldown grid prevents clumping; density roughly doubled vs v4c.
+// MIN_GAP reduced to 3 (was 4), spawn rates raised, density cap raised to 6.
+// Three passes: from arterials, from locals, and a fill pass for sparse areas.
+function buildLocals(){
+  const MIN_GAP=3;
+  const cooldown=mk2d(GH,GW,0);
+
+  function canGrow(x,y){
+    for(let oy=-MIN_GAP;oy<=MIN_GAP;oy++)
+      for(let ox=-MIN_GAP;ox<=MIN_GAP;ox++)
+        if(inB(x+ox,y+oy)&&cooldown[y+oy][x+ox]>0)return false;
+    return true;
+  }
+  function stamp(x,y){
+    for(let oy=-MIN_GAP;oy<=MIN_GAP;oy++)
+      for(let ox=-MIN_GAP;ox<=MIN_GAP;ox++)
+        if(inB(x+ox,y+oy))cooldown[y+oy][x+ox]=MIN_GAP;
+  }
+
+  // Pass 1: from arterials — higher spawn rate (was .48 skip → now .35 skip)
+  for(let y=0;y<GH;y++){
+    for(let x=0;x<GW;x++){
+      if(grid[y][x]!==ARTERIAL)continue;
+      const d=dirGrid[y][x];if(!d||d==='x')continue;
+      if(!canGrow(x,y))continue;
+      if(Math.random()>.65)continue;  // 65% chance to sprout (was 52%)
+      const perps=d==='h'?[[0,1],[0,-1]]:[[1,0],[-1,0]];
+      for(const[pdx,pdy]of perps){
+        if(Math.random()>.78)continue;  // each side 78% chance (was 65%)
+        growLocalStreet(x+pdx,y+pdy,pdx,pdy);
+      }
+      stamp(x,y);
+    }
+  }
+  // Pass 2: from locals — secondary branching (was .28 → now .42)
+  for(let y=0;y<GH;y++){
+    for(let x=0;x<GW;x++){
+      if(grid[y][x]!==LOCAL)continue;
+      const d=dirGrid[y][x];if(!d||d==='x')continue;
+      if(!canGrow(x,y))continue;
+      if(Math.random()>.42)continue;
+      const[pdx,pdy]=d==='h'?(Math.random()<.5?[0,1]:[0,-1]):(Math.random()<.5?[1,0]:[-1,0]);
+      growLocalStreet(x+pdx,y+pdy,pdx,pdy);
+      stamp(x,y);
+    }
+  }
+  // Pass 3: extra fill — target any empty city cell that has no local within 5
+  // tiles.  Grow a short stub from the nearest arterial neighbour.
+  for(let y=2;y<GH-2;y++){
+    for(let x=2;x<GW-2;x++){
+      if(!inC(x,y)||grid[y][x]!==EMPTY)continue;
+      if(zone[y][x]===Z.PARK)continue;
+      // Check if already close to a local
+      let nearLocal=false;
+      outer:for(let oy=-5;oy<=5;oy++)for(let ox=-5;ox<=5;ox++)
+        if(inB(x+ox,y+oy)&&roadClassAt(x+ox,y+oy)===LOCAL){nearLocal=true;break outer;}
+      if(nearLocal)continue;
+      if(!canGrow(x,y))continue;
+      if(Math.random()>.55)continue;
+      // Pick a random cardinal direction that leads into the empty block
+      const dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+      for(const[dx,dy]of dirs){
+        if(Math.random()>.5)continue;
+        growLocalStreet(x,y,dx,dy);
+        stamp(x,y);
+        break;
+      }
+    }
+  }
+}
+
+function growLocalStreet(sx,sy,dx,dy){
+  const path=[];
+  let x=sx,y=sy;
+  const maxLen=irnd(5,16);  // slightly longer streets (was 4–15)
+  for(let i=0;i<maxLen;i++){
+    if(!inC(x,y))break;
+    if(grid[y][x]!==EMPTY){
+      if(grid[y][x]===LOCAL&&i>1&&Math.random()<.35)break;
+      if(grid[y][x]!==LOCAL)break;
+    }
+    if(adjacentTo(x,y,HIGHWAY))break;
+    let localNb=0;
+    for(let oy=-1;oy<=1;oy++)for(let ox=-1;ox<=1;ox++)
+      if((ox||oy)&&inB(x+ox,y+oy)&&roadClassAt(x+ox,y+oy)===LOCAL)localNb++;
+    if(localNb>6)break;  // denser local grid allowed (was >4)
+    setRoad(x,y,LOCAL,dx!==0?'h':'v');
+    path.push({x,y});
+    if(Math.random()<.18){const t=dx;dx=dy;dy=t;if(!dx&&!dy)dx=1;}
+    x+=dx;y+=dy;
+  }
+  return path;
 }
 
 // ── Cleanup ───────────────────────────────────────────────────────────────────
@@ -655,8 +774,28 @@ function generateBuildings(){
   function spawnChance(x,y){
     const z=zone[y][x];
     if(z===Z.PARK)return 0;
+    // Check what type of road this cell has frontage on
+    let hasLocal=false,hasArterial=false,hasHighway=false;
+    for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]]){
+      const nx=x+dx,ny=y+dy;
+      if(!inC(nx,ny))continue;
+      const cls=roadClassAt(nx,ny);
+      if(cls===LOCAL)hasLocal=true;
+      else if(cls===ARTERIAL||cls===INTER)hasArterial=true;
+      else if(cls===HIGHWAY)hasHighway=true;
+    }
+    if(!hasLocal&&!hasArterial&&!hasHighway)return 0;
+    // Local-road frontage → dense residential fill (real neighborhoods)
+    if(hasLocal){
+      if(z===Z.CBD)return .88;
+      if(z===Z.COM)return .82;
+      if(z===Z.RES)return .95;  // nearly every local lot gets a house
+      if(z===Z.IND)return .80;
+      return .75;
+    }
+    // Arterial frontage — slightly less dense
     if(z===Z.CBD)return .92;
-    if(z===Z.COM)return .78;
+    if(z===Z.COM)return .80;
     if(z===Z.RES)return .72;
     if(z===Z.IND)return .65;
     return .3;

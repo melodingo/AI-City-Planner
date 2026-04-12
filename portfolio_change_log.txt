@@ -1,0 +1,84 @@
+AI City Planner - Browser Version Notes
+
+Purpose
+This file is a short history of the most noticeable changes in the browser-based
+city simulation so it can be reused later for portfolio documentation.
+
+Major Versions
+
+1. 7be5ade - initial browser city
+   - First working browser build of the city generator and traffic simulation.
+   - Established the basic visual style, road network, and moving cars.
+   - This version is the foundation for the rest of the project.
+
+2. ffcde6a - big visual changes
+   - Major redesign of the road system and rendering style.
+   - Introduced clearer road hierarchy and more structured city layout.
+   - Added more intentional visual language instead of a plain grid look.
+
+3. 3d722ca - visual polish
+   - Improved the presentation of the city and the HUD.
+   - Refined colors, spacing, and readability.
+   - This is where the simulation started feeling more like a finished UI.
+
+4. 60c5661 - sliders and controls
+   - Added more interactive viewing controls.
+   - Speed switching, zooming, and panning made the city easier to inspect.
+   - The project became less of a static demo and more of an explorable sandbox.
+
+5. fdbcc9a - more changes
+   - Continued iteration on the city generator and presentation.
+   - The focus shifted toward making the layout feel more believable and less repetitive.
+   - This stage was mostly refinement and tuning.
+
+6. 95a74ca - full rework
+   - The browser simulation was heavily reworked.
+   - The generation pipeline became more layered and more explicit about road classes.
+   - Highways, arterials, and local roads were reorganized into a more realistic hierarchy.
+   - Building placement and city cleanup logic were also pushed further.
+
+Main Issues Encountered
+
+- Road generation was the biggest repeated problem.
+  Early versions could look too random, too grid-like, or too sparse. The later
+  versions tried to balance structure with organic variation, which is why the
+  generator moved toward staged passes instead of a single pass.
+
+- Highway design needed several revisions.
+  Straight spokes alone did not feel realistic enough, so the project moved toward
+  long trunk roads, arterial connectors, and ring-road style structure.
+
+- Intersection handling was fragile.
+  Once multiple road classes were introduced, intersections had to remember which
+  classes were allowed through them. Without that, road connectivity could break.
+
+- Dense residential areas were hard to fill convincingly.
+  Simple random placement left large empty spaces, so the building system needed
+  frontage rules, backfill logic, and more aggressive tuning.
+
+- Rendering alignment mattered more than expected.
+  The project uses a top-left, y-down coordinate system, so road and building
+  positions have to stay consistent between logic and drawing.
+
+- A small code bug in building generation was able to break runtime.
+  The house placement logic had to keep the placement and occupancy update together
+  so the generator did not leave invalid state behind.
+
+Screenshot Assets
+
+- version_screenshots/1.0.png
+- version_screenshots/2.0_initial-browser-city.png
+- version_screenshots/3.0_big-visual-changes.png
+- version_screenshots/3.1.png
+- version_screenshots/3.2_visual-polish.png
+- version_screenshots/3.3.png
+- version_screenshots/4.0.png
+- version_screenshots/5.0.png
+
+Notes for later portfolio writing
+
+- Emphasize the evolution from a simple city demo into a structured simulation.
+- Highlight the move from random road generation to a layered road hierarchy.
+- Mention that the controls and zoom tools made the simulation inspectable.
+- Call out that the hardest part was not drawing the city, but keeping the network
+  believable and connected while the city grew more complex.
