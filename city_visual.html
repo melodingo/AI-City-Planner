@@ -420,6 +420,9 @@ const C = {
   carStop: '#e76464',
   carShadow: 'rgba(0,0,0,0.45)',
   headlight: 'rgba(255,245,170,0.55)',
+  park: '#2d5a3d',
+  parkLight: '#3d7a4d',
+  parkTree: '#1f3d26',
 };
 
 let grid = [];
@@ -1598,16 +1601,125 @@ function generateBuildings() {
     return false;
   }
 
+  function countBuiltNearby(x, y, r = 2) {
+    let count = 0;
+    for (let oy = -r; oy <= r; oy++) {
+      for (let ox = -r; ox <= r; ox++) {
+        if (ox === 0 && oy === 0) continue;
+        const nx = x + ox;
+        const ny = y + oy;
+        if (!inBounds(nx, ny)) continue;
+        if (builtMask[ny][nx]) count++;
+      }
+    }
+    return count;
+  }
+
+  function canPlaceBuildingAt(x, y, w, h) {
+    for (let oy = 0; oy < h; oy++) {
+      for (let ox = 0; ox < w; ox++) {
+        const nx = x + ox;
+        const ny = y + oy;
+        if (nx >= GRID_W || ny >= GRID_H) return false;
+        if (!inCity(nx, ny)) return false;
+        if (builtMask[ny][nx]) return false;
+        if (grid[ny][nx] !== EMPTY) return false;
+      }
+    }
+    return true;
+  }
+
+  function markBuildingFootprint(x, y, w, h) {
+    for (let oy = 0; oy < h; oy++) {
+      for (let ox = 0; ox < w; ox++) {
+        builtMask[y + oy][x + ox] = true;
+      }
+    }
+  }
+
+  function makeTowerAt(x, y, w, h) {
+    const px = x * CELL;
+    const py = y * CELL;
+    const blocks = [];
+    const count = 2 + (Math.random() * 2 | 0);
+    const cellW = w * CELL;
+    const cellH = h * CELL;
+    
+    for (let i = 0; i < count; i++) {
+      const m = 3;
+      const bw = 5 + (Math.random() * Math.max(2, cellW - 2 * m - 5) | 0);
+      const bh = 5 + (Math.random() * Math.max(2, cellH - 2 * m - 5) | 0);
+      const bx = m + (Math.random() * Math.max(1, cellW - 2 * m - bw) | 0);
+      const by = m + (Math.random() * Math.max(1, cellH - 2 * m - bh) | 0);
+      blocks.push({bx, by, bw, bh, dark: Math.random() < 0.5, round: 0});
+    }
+    buildingCache.push({px, py, blocks, toneDark: Math.random() < 0.5, pad: 1, w, h, type: 'tower'});
+    markBuildingFootprint(x, y, w, h);
+  }
+
+  function makeParkAt(x, y, w, h) {
+    const px = x * CELL;
+    const py = y * CELL;
+    const cellW = w * CELL;
+    const cellH = h * CELL;
+    const trees = [];
+    const treeCount = Math.ceil(cellW * cellH / (24 * 24));
+    for (let i = 0; i < treeCount; i++) {
+      trees.push({
+        tx: Math.random() * cellW,
+        ty: Math.random() * cellH,
+        size: 1.5 + Math.random()
+      });
+    }
+    buildingCache.push({px, py, w, h, type: 'park', trees, toneDark: Math.random() < 0.5});
+    markBuildingFootprint(x, y, w, h);
+  }
+
   buildingCache = [];
   for (let y = 0; y < GRID_H; y++) {
     for (let x = 0; x < GRID_W; x++) {
       if (!inCity(x, y)) continue;
       if (grid[y][x] !== EMPTY) continue;
       if (!hasResidentialFrontage(x, y)) continue;
+      if (builtMask[y][x]) continue;
 
       // Density is heavier near the city core and along main streets.
       // Edge lots and local-frontage parcels stay more open.
       if (Math.random() > lotFillChance(x, y)) continue;
+      
+      const density = countBuiltNearby(x, y, 2);
+      
+      // In very dense areas, try parks or towers
+       if (density > 6) {
+        // Try parks (2x2 to 6x6 variable sizes)
+         if (Math.random() < 0.12) {
+          const sizes = [[2,2], [2,3], [3,2], [3,3], [4,2], [2,4], [3,4], [4,3], [4,4], [5,3], [3,5], [5,5], [6,4], [4,6], [6,6]];
+          const [pw, ph] = sizes[Math.random() * sizes.length | 0];
+          if (canPlaceBuildingAt(x, y, pw, ph)) {
+            makeParkAt(x, y, pw, ph);
+            continue;
+          }
+        }
+        // Try 2x2 towers
+         if (Math.random() < 0.25 && canPlaceBuildingAt(x, y, 2, 2)) {
+          makeTowerAt(x, y, 2, 2);
+          continue;
+        }
+      }
+      
+       if (density > 3) {
+        // Try 2x1 or 1x2 towers
+         if (Math.random() < 0.18) {
+          if (Math.random() < 0.5 && canPlaceBuildingAt(x, y, 2, 1)) {
+            makeTowerAt(x, y, 2, 1);
+            continue;
+          } else if (canPlaceBuildingAt(x, y, 1, 2)) {
+            makeTowerAt(x, y, 1, 2);
+            continue;
+          }
+        }
+      }
+      
       makeBuildingAt(x, y);
     }
   }
@@ -1798,16 +1910,47 @@ function drawWorld() {
   }
 
   for (const b of buildingCache) {
-    const pad = b.pad;
-    ctx.fillStyle = b.toneDark ? C.lot : C.lotAlt;
-    ctx.beginPath();
-    ctx.roundRect(b.px + pad, b.py + pad, CELL - pad * 2, CELL - pad * 2, 5);
-    ctx.fill();
-    for (const r of b.blocks) {
-      ctx.fillStyle = r.dark ? C.roofA : C.roofB;
+    if (b.type === 'park') {
+      // Draw park as green area
+      const cellW = b.w * CELL;
+      const cellH = b.h * CELL;
+      ctx.fillStyle = b.toneDark ? C.park : C.parkLight;
+      ctx.fillRect(b.px, b.py, cellW, cellH);
+      // Draw tree dots
+      ctx.fillStyle = C.parkTree;
+      for (const tree of b.trees) {
+        ctx.beginPath();
+        ctx.arc(b.px + tree.tx, b.py + tree.ty, tree.size * 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else if (b.type === 'tower') {
+      // Draw tower (multi-cell building with tighter blocks)
+      const cellW = b.w * CELL;
+      const cellH = b.h * CELL;
+      const pad = b.pad;
+      ctx.fillStyle = b.toneDark ? C.lot : C.lotAlt;
       ctx.beginPath();
-      ctx.roundRect(b.px + r.bx, b.py + r.by, r.bw, r.bh, r.round);
+      ctx.roundRect(b.px + pad, b.py + pad, cellW - pad * 2, cellH - pad * 2, 5);
       ctx.fill();
+      for (const r of b.blocks) {
+        ctx.fillStyle = r.dark ? C.roofA : C.roofB;
+        ctx.beginPath();
+        ctx.roundRect(b.px + r.bx, b.py + r.by, r.bw, r.bh, r.round);
+        ctx.fill();
+      }
+    } else {
+      // Draw regular 1x1 house
+      const pad = b.pad;
+      ctx.fillStyle = b.toneDark ? C.lot : C.lotAlt;
+      ctx.beginPath();
+      ctx.roundRect(b.px + pad, b.py + pad, CELL - pad * 2, CELL - pad * 2, 5);
+      ctx.fill();
+      for (const r of b.blocks) {
+        ctx.fillStyle = r.dark ? C.roofA : C.roofB;
+        ctx.beginPath();
+        ctx.roundRect(b.px + r.bx, b.py + r.by, r.bw, r.bh, r.round);
+        ctx.fill();
+      }
     }
   }
 
