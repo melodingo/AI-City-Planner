@@ -1113,6 +1113,9 @@ class Car{
 const MAX_CARS=180;
 let drvTilesCache=null;
 let drvByZone={};
+let metricsFrozen=false;
+let fullStopStreak=0;
+const FREEZE_AFTER_FULL_STOP_TICKS=20;
 
 function buildDrvCache(){
   drvTilesCache=[];drvByZone={};
@@ -1133,6 +1136,8 @@ function simReset(){
   cars=[];completed=[];occupied=new Set();interLocks=new Map();
   tickN=0;stoppedN=0;carId=0;simTime=.25;lastDayTick=0;
   drvTilesCache=null;
+  metricsFrozen=false;
+  fullStopStreak=0;
 }
 
 function currentHour(){return(simTime*24|0)%24;}
@@ -1226,6 +1231,8 @@ function signalAllows(nx,ny,dx,dy){
 }
 
 function simStep(){
+  if(metricsFrozen)return;
+
   tickN++;
   // Advance time of day
   simTime=(simTime+1/SIM_DAY)%1;
@@ -1259,6 +1266,18 @@ function simStep(){
   });
   // Trim completed array to avoid memory bloat
   if(completed.length>2000)completed.splice(0,500);
+
+  // Freeze counters if all active cars are stuck for a sustained period.
+  if(cars.length>0&&stoppedN===cars.length){
+    fullStopStreak++;
+    if(fullStopStreak>=FREEZE_AFTER_FULL_STOP_TICKS){
+      metricsFrozen=true;
+      return;
+    }
+  }else{
+    fullStopStreak=0;
+  }
+
   spawnCar();
 }
 
