@@ -315,7 +315,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <div class="sr-row"><span>Deadlock recoveries</span><span id="sr-m-deadlock">0</span></div>
     <div class="sr-row sr-row-hotspots"><span>Hotspots</span><span id="sr-m-hotspots">none</span></div>
   </div>
-  <div id="version-tag">V6</div>
+  <div id="version-tag">V6.2</div>
   <div class="panel" id="zoom-tip" style="bottom:13px;left:50%;transform:translateX(-50%)">Scroll · zoom &nbsp;|&nbsp; Drag · pan &nbsp;|&nbsp; New City · regenerate</div>
 </div>
 
@@ -464,7 +464,7 @@ function clone2d(arr){
 function exportMapState(){
   return {
     format: 'CityFlowMap',
-    version: 'V6',
+    version: 'V6.2',
     width: GW,
     height: GH,
     grid: clone2d(grid),
@@ -559,13 +559,17 @@ async function buildCity(prog){
   prog(8,'Parks');await af();
   placeParks(cx,cy);
 
-  // 4. Highways — radial spokes + ring road
+  // 4. Highways — long cross-city corridors
   prog(12,'Highways');await af();
   buildHighways(cx,cy,rx,ry);
 
   // 5. Arterial grid — neighbourhood collector roads
   prog(38,'Arterial roads');await af();
   buildArterials(cx,cy,rx,ry);
+
+  // 5b. Ramp spacing — keep motorway access points sparse
+  prog(55,'Ramp spacing');await af();
+  pruneHighwayRamps();
 
   // 6. Local roads — organic growth from arterials
   prog(58,'Local streets');await af();
@@ -656,85 +660,138 @@ function colHasCityMask(x){
   for(let y=0;y<GH;y++)if(cityMask[y][x])return true;return false;
 }
 
-// ── HIGHWAYS: ring road + radial spokes ───────────────────────────────────────
-// Architecture mirrors real cities (M25 + A-roads, Chicago Loop + I-highways):
-//
-//  1. RING ROAD — one large rectangular loop at ~60% of city radius.
-//     Drawn as four pure H/V segments.  The loop is always closed.
-//
-//  2. RADIAL SPOKES — 3–5 spokes, evenly angled from city edge inward.
-//     Each spoke travels primarily along one axis (H or V) with one small
-//     midpoint jog, then terminates where it meets the ring perimeter.
-//     The spoke is an L-shaped path: long leg → short connector to ring face.
-//
-//  3. OPTIONAL INNER CROSS — ~60% chance, adds one H + one V through the CBD.
-//
-//  Because every spoke connects to the ring, the whole highway network is one
-//  connected graph — no orphaned blobs.
+// ── HIGHWAYS: long cross-city corridors ──────────────────────────────────────
+// 2-4 total highways, each dominant-axis (H or V), with optional single gentle
+// parallel shift and enforced separation between parallel corridors.
+const MIN_HWY_SEP=28;
+const MIN_RAMP_SPACING=12;
+
 function buildHighways(cx,cy,rx,ry){
-  // Ring dimensions — large enough to be clearly visible, not a tiny box
-  const rfx=rnd(.55,.65), rfy=rnd(.55,.65);
-  const rl=clampI(cx-rx*rfx+rnd(-3,3),3,GW-4);
-  const rr=clampI(cx+rx*rfx+rnd(-3,3),3,GW-4);
-  const rt2=clampI(cy-ry*rfy+rnd(-3,3),3,GH-4);
-  const rb=clampI(cy+ry*rfy+rnd(-3,3),3,GH-4);
+  const nH=irnd(1,2),nV=irnd(1,2);
+  const usedHY=[],usedVX=[];
 
-  // Draw the ring (four straight sides)
-  drawHSeg(rt2,rl,rr,HIGHWAY);
-  drawHSeg(rb, rl,rr,HIGHWAY);
-  drawVSeg(rl, rt2,rb,HIGHWAY);
-  drawVSeg(rr, rt2,rb,HIGHWAY);
+  const farFromUsed=(v,used)=>used.every(u=>Math.abs(u-v)>=MIN_HWY_SEP);
 
-  // Radial spokes: evenly spaced angles with small per-spoke jitter
-  const nSpokes=irnd(3,5);
-  for(let i=0;i<nSpokes;i++){
-    const ang=(i/nSpokes)*Math.PI*2+rnd(-.3,.3);
-    const cosA=Math.cos(ang), sinA=Math.sin(ang);
+  const pickHorizontalY=(base)=>{
+    for(let tries=0;tries<10;tries++){
+      const y=clampI(base+rnd(-6,6),3,GH-4);
+      if(farFromUsed(y,usedHY))return y;
+    }
+    return null;
+  };
 
-    // Entry point: city boundary
-    const ex=clampI(cx+cosA*rx*.93,2,GW-3);
-    const ey=clampI(cy+sinA*ry*.93,2,GH-3);
-    cityMask[ey][ex]=true;
+  const pickVerticalX=(base)=>{
+    for(let tries=0;tries<10;tries++){
+      const x=clampI(base+rnd(-6,6),3,GW-4);
+      if(farFromUsed(x,usedVX))return x;
+    }
+    return null;
+  };
 
-    // Where the spoke meets the ring face (closest face to the spoke angle)
-    let ringX,ringY;
-    if(Math.abs(cosA)>=Math.abs(sinA)){
-      // Horizontal-dominant spoke → hits left or right side of ring
-      ringX=cosA>0?rr:rl;
-      ringY=clampI(cy+sinA*(rb-rt2)*.5+rnd(-4,4),rt2,rb);
+  for(let i=0;i<nH;i++){
+    const t=(i+.5)/nH;
+    const baseY=clampI(cy-ry*.6+(ry*1.2)*t,3,GH-4);
+    const y=pickHorizontalY(baseY);
+    if(y===null)continue;
+
+    let x0=0,x1=GW-1;
+    while(x0<GW&&!cityMask[y]?.[x0])x0++;
+    while(x1>0&&!cityMask[y]?.[x1])x1--;
+    if(x1-x0<Math.floor(GW*.55))continue;
+
+    x0=clampI(x0+irnd(2,5),1,GW-2);
+    x1=clampI(x1-irnd(2,5),1,GW-2);
+
+    let devY=y;
+    if(Math.random()<.8){
+      const midX=clampI(Math.round((x0+x1)/2),x0+6,x1-6);
+      const candDevY=clampI(y+irnd(-8,8),3,GH-4);
+      if(candDevY!==y&&farFromUsed(candDevY,usedHY))devY=candDevY;
+      if(devY!==y){
+        drawHSeg(y,x0,midX,HIGHWAY);
+        drawVSeg(midX,y,devY,HIGHWAY);
+        drawHSeg(devY,midX,x1,HIGHWAY);
+      } else {
+        drawHSeg(y,x0,x1,HIGHWAY);
+      }
     } else {
-      // Vertical-dominant spoke → hits top or bottom of ring
-      ringX=clampI(cx+cosA*(rr-rl)*.5+rnd(-4,4),rl,rr);
-      ringY=sinA>0?rb:rt2;
+      drawHSeg(y,x0,x1,HIGHWAY);
     }
 
-    // Draw: spoke goes along primary axis with one midpoint offset jog
-    // so it's not perfectly straight (mirrors real highway bends)
-    const midX=clampI((ex+ringX)/2+rnd(-6,6),2,GW-3);
-    const midY=clampI((ey+ringY)/2+rnd(-5,5),2,GH-3);
+    usedHY.push(y);
+    if(devY!==y)usedHY.push(devY);
+  }
 
-    if(Math.abs(cosA)>=Math.abs(sinA)){
-      // H-primary: horizontal to mid, small V jog, horizontal to ring face
-      drawHSeg(ey, ex, midX, HIGHWAY);
-      drawVSeg(midX, ey, midY, HIGHWAY);
-      drawHSeg(midY, midX, ringX, HIGHWAY);
-      // Short V connector to reach the ring row
-      drawVSeg(ringX, midY, ringY, HIGHWAY);
+  for(let i=0;i<nV;i++){
+    const t=(i+.5)/nV;
+    const baseX=clampI(cx-rx*.6+(rx*1.2)*t,3,GW-4);
+    const x=pickVerticalX(baseX);
+    if(x===null)continue;
+
+    let y0=0,y1=GH-1;
+    while(y0<GH&&!cityMask[y0]?.[x])y0++;
+    while(y1>0&&!cityMask[y1]?.[x])y1--;
+    if(y1-y0<Math.floor(GH*.55))continue;
+
+    y0=clampI(y0+irnd(2,5),1,GH-2);
+    y1=clampI(y1-irnd(2,5),1,GH-2);
+
+    let devX=x;
+    if(Math.random()<.8){
+      const midY=clampI(Math.round((y0+y1)/2),y0+6,y1-6);
+      const candDevX=clampI(x+irnd(-8,8),3,GW-4);
+      if(candDevX!==x&&farFromUsed(candDevX,usedVX))devX=candDevX;
+      if(devX!==x){
+        drawVSeg(x,y0,midY,HIGHWAY);
+        drawHSeg(midY,x,devX,HIGHWAY);
+        drawVSeg(devX,midY,y1,HIGHWAY);
+      } else {
+        drawVSeg(x,y0,y1,HIGHWAY);
+      }
     } else {
-      // V-primary
-      drawVSeg(ex, ey, midY, HIGHWAY);
-      drawHSeg(midY, ex, midX, HIGHWAY);
-      drawVSeg(midX, midY, ringY, HIGHWAY);
-      drawHSeg(ringY, midX, ringX, HIGHWAY);
+      drawVSeg(x,y0,y1,HIGHWAY);
+    }
+
+    usedVX.push(x);
+    if(devX!==x)usedVX.push(devX);
+  }
+}
+
+function pruneHighwayRamps(){
+  for(let y=0;y<GH;y++){
+    let lastRampX=-999;
+    for(let x=0;x<GW;x++){
+      if(grid[y][x]!==HIGHWAY&&grid[y][x]!==INTER)continue;
+      if(dirGrid[y][x]!=='h'&&dirGrid[y][x]!=='x')continue;
+      if(grid[y][x]!==INTER)continue;
+      const hasArt=roadNbrs(x,y).some(n=>roadClassAt(n.x,n.y)===ARTERIAL);
+      if(!hasArt)continue;
+      if(x-lastRampX<MIN_RAMP_SPACING){
+        grid[y][x]=HIGHWAY;
+        dirGrid[y][x]='h';
+        interMask[y][x]=0;
+      } else {
+        lastRampX=x;
+      }
     }
   }
 
-  // Optional inner cross through CBD (~60% chance)
-  if(Math.random()<.6){
-    const iy=clampI(cy+rnd(-7,7),rt2+1,rb-1);
-    const ix=clampI(cx+rnd(-7,7),rl+1,rr-1);
-    drawHSeg(iy,rl,rr,HIGHWAY);
-    drawVSeg(ix,rt2,rb,HIGHWAY);
+  for(let x=0;x<GW;x++){
+    let lastRampY=-999;
+    for(let y=0;y<GH;y++){
+      if(grid[y][x]!==HIGHWAY&&grid[y][x]!==INTER)continue;
+      if(dirGrid[y][x]!=='v'&&dirGrid[y][x]!=='x')continue;
+      if(grid[y][x]!==INTER)continue;
+      const hasArt=roadNbrs(x,y).some(n=>roadClassAt(n.x,n.y)===ARTERIAL);
+      if(!hasArt)continue;
+      if(y-lastRampY<MIN_RAMP_SPACING){
+        grid[y][x]=HIGHWAY;
+        dirGrid[y][x]='v';
+        interMask[y][x]=0;
+      } else {
+        lastRampY=y;
+      }
+    }
   }
 }
 
@@ -1167,7 +1224,7 @@ function localDensityPenalty(x,y,occMap){
 
 function moveCost(x,y,opts={}){
   let base;
-  switch(grid[y][x]){case HIGHWAY:base=1;break;case ARTERIAL:base=2;break;default:base=3;break;}
+  switch(grid[y][x]){case HIGHWAY:base=1;break;case ARTERIAL:base=2;break;default:base=5;break;}
   const occ=opts.occMap;
   const congestionWeight=opts.congestionWeight??1;
   const congestion=(occ?(occ.get(oKey(x,y))||0):0)+localDensityPenalty(x,y,occ);

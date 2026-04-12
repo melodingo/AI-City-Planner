@@ -6,6 +6,12 @@ city simulation so it can be reused later for portfolio documentation.
 
 Major Versions
 
+8. V6.2 - highway spacing stability pass (Apr 2026)
+  - Updated highway generation to enforce dominant-axis corridor separation more reliably.
+  - Fixed cases where shifted corridor segments could produce two near-parallel highways side-by-side.
+  - Kept strict motorway access control by pruning highway ramp points that are too close together.
+  - Retained highway-favoring travel costs (highway 1, arterial 2, local 5) and local↔highway direct-blocking.
+
 7. V6 - editor and traffic AI upgrades (Apr 2026)
   - Added an in-app city editor with paint tools for roads, zoning, and land edits.
   - Exposed a `window.cityEditor` API for future scripted/AI-driven city changes.
