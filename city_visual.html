@@ -263,7 +263,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <div class="sr-row"><span>Deadlock recoveries</span><span id="sr-m-deadlock">0</span></div>
     <div class="sr-row sr-row-hotspots"><span>Hotspots</span><span id="sr-m-hotspots">none</span></div>
   </div>
-  <div id="version-tag">V5.2</div>
+  <div id="version-tag">V5.3</div>
   <div class="panel" id="zoom-tip" style="bottom:13px;left:50%;transform:translateX(-50%)">Scroll · zoom &nbsp;|&nbsp; Drag · pan &nbsp;|&nbsp; New City · regenerate</div>
 </div>
 
@@ -412,7 +412,7 @@ function clone2d(arr){
 function exportMapState(){
   return {
     format: 'CityFlowMap',
-    version: 'V5.2',
+    version: 'V5.3',
     width: GW,
     height: GH,
     grid: clone2d(grid),
@@ -1255,6 +1255,7 @@ const HOTSPOT_LIMIT=4;
 const THROUGHPUT_WINDOW_TICKS=120;
 const SIGNAL_MIN_GREEN=8;
 const SIGNAL_MAX_GREEN=20;
+const SIGNAL_PASS_PER_TICK=4;
 const stopStats={
   noRoute:0,
   blocked:0,
@@ -1287,6 +1288,14 @@ function recordStop(reason){
 function decodeKey(k){
   const x=(k/1000)|0;
   return{x,y:k-x*1000};
+}
+
+function newApproachQueues(){
+  return{N:[],E:[],S:[],W:[]};
+}
+
+function approachQueueTotal(qs){
+  return(qs.N?.length||0)+(qs.E?.length||0)+(qs.S?.length||0)+(qs.W?.length||0);
 }
 
 function flushInterWait(car){
@@ -1364,12 +1373,15 @@ function updateTrafficMetrics(occMap,arrivalsThisTick){
 
   const queueLengths=[];
   let queueTotal=0,queueMax=0;
-  for(const[k,q]of interQueues.entries()){
+  for(const[k,qs]of interQueues.entries()){
     const pos=decodeKey(k);
-    const len=q.length;
-    queueLengths.push({x:pos.x,y:pos.y,length:len});
-    queueTotal+=len;
-    if(len>queueMax)queueMax=len;
+    for(const a of['N','E','S','W']){
+      const len=qs[a]?.length||0;
+      if(!len)continue;
+      queueLengths.push({x:pos.x,y:pos.y,approach:a,length:len});
+      queueTotal+=len;
+      if(len>queueMax)queueMax=len;
+    }
   }
   const avgQueueLength=queueLengths.length?queueTotal/queueLengths.length:0;
 
@@ -1509,8 +1521,7 @@ function simReset(){
   drvTilesCache=null;
   metricsFrozen=false;
   fullStopStreak=0;
-  signalDemandH.clear();
-  signalDemandV.clear();
+  signalDemand.clear();
   resetStopStats();
   resetTrafficMetrics();
 }
@@ -1575,16 +1586,50 @@ function spawnCar(){
 }
 
 // Traffic signal state: intersections cycle green/red
-// Each intersection gets a phase (0 or 1) and a timer
-const signalPhase=new Map();
+// Each intersection tracks active incoming approach (N/E/S/W) and timer
+const signalApproach=new Map();
 const signalTimer=new Map();
-const signalDemandH=new Map();
-const signalDemandV=new Map();
-const SIGNAL_CYCLE=18; // ticks per phase
+const signalDemand=new Map();
 
-function noteSignalDemand(k,dx){
-  const target=dx!==0?signalDemandH:signalDemandV;
-  target.set(k,(target.get(k)||0)+1);
+function approachFromMove(dx,dy){
+  if(dx>0)return'W';
+  if(dx<0)return'E';
+  if(dy>0)return'N';
+  return'S';
+}
+
+function approachOrderAfter(current,available){
+  const ring=['N','E','S','W'];
+  const start=Math.max(0,ring.indexOf(current));
+  for(let i=1;i<=4;i++){
+    const a=ring[(start+i)%4];
+    if(available.includes(a))return a;
+  }
+  return available[0];
+}
+
+function intersectionApproaches(x,y){
+  const out=[];
+  const cand=[
+    {a:'N',dx:0,dy:1,fx:0,fy:-1},
+    {a:'E',dx:-1,dy:0,fx:1,fy:0},
+    {a:'S',dx:0,dy:-1,fx:0,fy:1},
+    {a:'W',dx:1,dy:0,fx:-1,fy:0},
+  ];
+  for(const c of cand){
+    const nx=x+c.fx,ny=y+c.fy;
+    if(!isDrv(nx,ny))continue;
+    if(!dirCompat(dirGrid[ny][nx],c.dx,c.dy))continue;
+    out.push(c.a);
+  }
+  return out;
+}
+
+function noteSignalDemand(k,dx,dy){
+  const a=approachFromMove(dx,dy);
+  const d=signalDemand.get(k)||{N:0,E:0,S:0,W:0};
+  d[a]++;
+  signalDemand.set(k,d);
 }
 
 function updateSignals(){
@@ -1595,23 +1640,30 @@ function updateSignals(){
       const m=interMask[y][x]||0;
       if(!(m&BIT[HIGHWAY])&&!(m&BIT[ARTERIAL]))continue;
       const k=oKey(x,y);
-      let phase=signalPhase.get(k)||0;
+      const available=intersectionApproaches(x,y);
+      if(!available.length)continue;
+      let active=signalApproach.get(k);
+      if(!active||!available.includes(active))active=available[0];
       let timer=(signalTimer.get(k)||0)+1;
-      const dh=signalDemandH.get(k)||0;
-      const dv=signalDemandV.get(k)||0;
-      const greenDemand=phase===0?dh:dv;
-      const redDemand=phase===0?dv:dh;
+      const d=signalDemand.get(k)||{N:0,E:0,S:0,W:0};
+      const greenDemand=d[active]||0;
+      let bestApproach=active,bestDemand=greenDemand;
+      for(const a of available){
+        const v=d[a]||0;
+        if(v>bestDemand){bestDemand=v;bestApproach=a;}
+      }
       let flip=false;
       if(timer>=SIGNAL_MAX_GREEN)flip=true;
       else if(timer>=SIGNAL_MIN_GREEN){
-        if(redDemand>greenDemand+1)flip=true;
-        else if(greenDemand===0&&redDemand>0)flip=true;
+        if(bestApproach!==active&&bestDemand>greenDemand+1)flip=true;
+        else if(greenDemand===0&&bestDemand>0)flip=true;
       }
       if(flip){
         timer=0;
-        phase^=1;
+        if(bestApproach!==active)active=bestApproach;
+        else active=approachOrderAfter(active,available);
       }
-      signalPhase.set(k,phase);
+      signalApproach.set(k,active);
       signalTimer.set(k,timer);
     }
   }
@@ -1622,9 +1674,9 @@ function signalAllows(nx,ny,dx,dy){
   const m=interMask[ny][nx]||0;
   if(!(m&BIT[HIGHWAY])&&!(m&BIT[ARTERIAL]))return true; // local intersections free-flowing
   const k=oKey(nx,ny);
-  const phase=signalPhase.get(k)||0;
-  // Phase 0: horizontal passes; Phase 1: vertical passes
-  return phase===0?dy===0:dx===0;
+  const active=signalApproach.get(k);
+  if(!active)return true;
+  return approachFromMove(dx,dy)===active;
 }
 
 function simStep(){
@@ -1634,24 +1686,33 @@ function simStep(){
   // Advance time of day
   simTime=(simTime+1/SIM_DAY)%1;
   updateSignals();
-  signalDemandH.clear();
-  signalDemandV.clear();
+  signalDemand.clear();
   interLocks.clear();stoppedN=0;
   const occMap=buildOccMap();
   const carByPos=new Map();
   for(const c of cars)carByPos.set(oKey(c.x,c.y),c);
   const activeIds=new Set(cars.map(c=>c.id));
+  const carById=new Map(cars.map(c=>[c.id,c]));
   for(const[k,v]of interLocks.entries())if(!activeIds.has(v))interLocks.delete(k);
-  for(const[k,q]of interQueues.entries()){
-    const next=q.filter(id=>activeIds.has(id));
-    if(next.length)interQueues.set(k,next);else interQueues.delete(k);
+  for(const[k,qs]of interQueues.entries()){
+    const clean={
+      N:(qs.N||[]).filter(id=>activeIds.has(id)),
+      E:(qs.E||[]).filter(id=>activeIds.has(id)),
+      S:(qs.S||[]).filter(id=>activeIds.has(id)),
+      W:(qs.W||[]).filter(id=>activeIds.has(id)),
+    };
+    if(approachQueueTotal(clean))interQueues.set(k,clean);else interQueues.delete(k);
   }
-  const interPassAxis=new Map();
+  const interPassApproach=new Map();
   const interPassCount=new Map();
   const movedThisTick=new Set();
+  const reservedIntersectionExits=new Set();
   let arrivalsThisTick=0;
   // Priority: cars stopped longer are evaluated first to reduce stalemates.
   const driveOrder=[...cars].sort((a,b)=>{
+    const aInInter=grid[a.y][a.x]===INTER?1:0;
+    const bInInter=grid[b.y][b.x]===INTER?1:0;
+    if(aInInter!==bInInter)return bInInter-aInInter;
     const pa=b.stuckTicks*3+b.currentInterWait;
     const pb=a.stuckTicks*3+a.currentInterWait;
     if(pa!==pb)return pa-pb;
@@ -1693,9 +1754,15 @@ function simStep(){
           nxt=c.nextStep();
         }
       }
-      if(!nxt){c.tickStop();recordStop('noRoute');continue;}
+      if(!nxt){
+        if(grid[c.y][c.x]===INTER)c.tickStop(true,false);
+        else c.tickStop();
+        recordStop('noRoute');
+        continue;
+      }
     }
     const nk=oKey(nxt.x,nxt.y);
+    let reserveExitKey=null;
     if(occupied.has(nk)){
       const other=carByPos.get(nk);
       const otherNxt=other&&other.nextStep?other.nextStep():null;
@@ -1718,31 +1785,64 @@ function simStep(){
         movedThisTick.add(c.id);movedThisTick.add(other.id);
         continue;
       }
-      c.tickStop();recordStop('blocked');continue;
+      if(grid[c.y][c.x]===INTER){
+        c.tickStop(true,false);
+        recordStop('intersectionLock');
+      }else{
+        c.tickStop();
+        recordStop('blocked');
+      }
+      continue;
     }
     if(grid[nxt.y][nxt.x]===INTER){
+      // Don't block the box: only enter if immediate exit can also clear.
+      const enteringIntersection=grid[c.y][c.x]!==INTER;
+      if(enteringIntersection&&c.path.length>1){
+        const exitStep=c.path[1];
+        const exitKey=oKey(exitStep.x,exitStep.y);
+        if(occupied.has(exitKey)||reservedIntersectionExits.has(exitKey)){
+          c.tickStop(true,false);
+          recordStop('intersectionLock');
+          continue;
+        }
+        reserveExitKey=exitKey;
+      }
+
       if(!signalAllows(nxt.x,nxt.y,nxt.dx,nxt.dy)){
-        noteSignalDemand(nk,nxt.dx);
+        noteSignalDemand(nk,nxt.dx,nxt.dy);
         c.tickStop(true,false);
         recordStop('redSignal');
         continue;
       }
-      const q=interQueues.get(nk)||[];
+      const approach=approachFromMove(nxt.dx,nxt.dy);
+      const qs=interQueues.get(nk)||newApproachQueues();
+      const q=qs[approach];
       if(!q.includes(c.id))q.push(c.id);
-      interQueues.set(nk,q);
+
+      // Prune stale head entries for this approach queue.
+      while(q.length){
+        const headCar=carById.get(q[0]);
+        if(!headCar){q.shift();continue;}
+        const headNxt=headCar.nextStep();
+        if(!headNxt||headNxt.x!==nxt.x||headNxt.y!==nxt.y){q.shift();continue;}
+        if(approachFromMove(headNxt.dx,headNxt.dy)!==approach){q.shift();continue;}
+        break;
+      }
+
+      interQueues.set(nk,qs);
       if(q[0]!==c.id){c.tickStop(true,false);recordStop('intersectionLock');continue;}
 
-      const axis=nxt.dx!==0?'h':'v';
-      const usedAxis=interPassAxis.get(nk);
+      const usedApproach=interPassApproach.get(nk);
       const passCount=interPassCount.get(nk)||0;
-      const axisCompatible=(passCount===0)||(usedAxis===axis&&passCount<2);
-      if(!axisCompatible){c.tickStop(true,false);recordStop('intersectionLock');continue;}
+      const approachCompatible=(passCount===0)||(usedApproach===approach&&passCount<SIGNAL_PASS_PER_TICK);
+      if(!approachCompatible){c.tickStop(true,false);recordStop('intersectionLock');continue;}
 
       q.shift();
-      if(q.length===0)interQueues.delete(nk);else interQueues.set(nk,q);
-      interPassAxis.set(nk,axis);
+      if(!approachQueueTotal(qs))interQueues.delete(nk);else interQueues.set(nk,qs);
+      interPassApproach.set(nk,approach);
       interPassCount.set(nk,passCount+1);
     }
+    if(reserveExitKey!==null)reservedIntersectionExits.add(reserveExitKey);
     const oldK=oKey(c.x,c.y);
     occupied.delete(oldK);
     carByPos.delete(oldK);
@@ -1898,14 +1998,24 @@ function drawRoads(range){
       const sy=y*CELL*scale+view.panY+(CELL/2)*scale;
       ctx.fillStyle=COL.inter;
       ctx.beginPath();ctx.arc(sx,sy,hw,0,Math.PI*2);ctx.fill();
-      // Traffic signal dot
+      // Traffic signal indicators per incoming approach.
       if(scale>.6&&(cls===HIGHWAY||cls===ARTERIAL)){
         const k=oKey(x,y);
-        const phase=signalPhase.get(k)||0;
-        const timer=signalTimer.get(k)||0;
-        const isGreen=timer>SIGNAL_CYCLE*.25;
-        ctx.fillStyle=isGreen?(phase===0?COL.signal_green:COL.signal_red):COL.signal_amber;
-        ctx.beginPath();ctx.arc(sx,sy,2.5*scale,0,Math.PI*2);ctx.fill();
+        const active=signalApproach.get(k);
+        const aps=intersectionApproaches(x,y);
+        const off=3.6*scale;
+        const dots={
+          N:{x:sx,y:sy-off},
+          E:{x:sx+off,y:sy},
+          S:{x:sx,y:sy+off},
+          W:{x:sx-off,y:sy},
+        };
+        for(const a of aps){
+          const p=dots[a];
+          if(!p)continue;
+          ctx.fillStyle=active===a?COL.signal_green:COL.signal_red;
+          ctx.beginPath();ctx.arc(p.x,p.y,1.9*scale,0,Math.PI*2);ctx.fill();
+        }
       }
     }
   }
