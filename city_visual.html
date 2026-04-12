@@ -113,7 +113,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 #ai-bar-fill{height:100%;width:0%;background:var(--green);transition:width .2s}
 #ai-meta{font-size:8px;color:var(--dim);letter-spacing:.05em}
 
-#stop-panel{top:118px;right:13px;min-width:230px;pointer-events:auto}
+#stop-panel{top:118px;right:13px;width:340px;min-width:340px;max-width:340px;pointer-events:auto}
 #stop-panel.hidden{display:none}
 #stop-panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
 #stop-panel-title{font-size:9px;letter-spacing:.12em;color:var(--accent)}
@@ -122,8 +122,52 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
   width:16px;height:16px;line-height:14px;font-size:10px;cursor:pointer;
 }
 #btn-stop-panel-close:hover{color:var(--accent)}
-.sr-row{display:flex;justify-content:space-between;gap:10px;font-size:8px;letter-spacing:.04em;color:var(--text);margin-bottom:2px}
-.sr-row span:last-child{color:#dbe4f5}
+.sr-row{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:8px;letter-spacing:.04em;color:var(--text);margin-bottom:2px}
+.sr-row span:first-child{flex:1;min-width:0}
+.sr-row span:last-child{
+  color:#dbe4f5;
+  width:120px;
+  min-width:120px;
+  text-align:right;
+  font-variant-numeric:tabular-nums;
+  font-feature-settings:'tnum' 1;
+}
+.sr-section{margin-top:6px;padding-top:5px;border-top:1px solid var(--border);font-size:8px;letter-spacing:.1em;color:var(--dim)}
+.sr-row-hotspots{align-items:flex-start;justify-content:flex-start;gap:6px}
+.sr-row-hotspots span:first-child{
+  flex:none;
+  min-width:auto;
+}
+.sr-row-hotspots span:last-child{
+  width:auto;
+  min-width:0;
+  flex:none;
+  text-align:left;
+  padding-left:0;
+}
+#sr-m-hotspots{
+  display:block;
+  white-space:nowrap;
+  overflow:hidden;
+  height:16px;
+  text-align:left;
+  text-overflow:ellipsis;
+}
+.hotspot-chip{
+  display:inline-block;
+  margin:0 2px 3px 0;
+  padding:1px 4px;
+  border:1px solid #36405a;
+  border-radius:3px;
+  color:#dbe4f5;
+  cursor:pointer;
+  font-size:7px;
+}
+.hotspot-chip:hover,.hotspot-chip.on{
+  border-color:var(--accent);
+  color:var(--accent);
+  background:rgba(240,180,41,.1);
+}
 
 /* generation overlay */
 #gen-overlay{
@@ -206,6 +250,18 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <div class="sr-row"><span>Red signal</span><span id="sr-red">0</span></div>
     <div class="sr-row"><span>Intersection lock</span><span id="sr-lock">0</span></div>
     <div class="sr-row"><span>Freeze events</span><span id="sr-freeze">0</span></div>
+    <div class="sr-section">AI METRICS</div>
+    <div class="sr-row"><span>Avg cars / tile</span><span id="sr-m-cong-avg">0.00</span></div>
+    <div class="sr-row"><span>Max congestion</span><span id="sr-m-cong-max">0.00</span></div>
+    <div class="sr-row"><span>Tiles above threshold</span><span id="sr-m-cong-hot">0</span></div>
+    <div class="sr-row"><span>Avg speed</span><span id="sr-m-speed">0.00</span></div>
+    <div class="sr-row"><span>Moving / stopped</span><span id="sr-m-move-stop">0.00 / 0.00</span></div>
+    <div class="sr-row"><span>Throughput (120t)</span><span id="sr-m-throughput">0</span></div>
+    <div class="sr-row"><span>Avg intersection wait</span><span id="sr-m-int-wait">0.00</span></div>
+    <div class="sr-row"><span>Max intersection queue</span><span id="sr-m-int-qmax">0</span></div>
+    <div class="sr-row"><span>Reroutes / car</span><span id="sr-m-reroutes">0.00</span></div>
+    <div class="sr-row"><span>Deadlock recoveries</span><span id="sr-m-deadlock">0</span></div>
+    <div class="sr-row sr-row-hotspots"><span>Hotspots</span><span id="sr-m-hotspots">none</span></div>
   </div>
   <div id="version-tag">V5.2</div>
   <div class="panel" id="zoom-tip" style="bottom:13px;left:50%;transform:translateX(-50%)">Scroll · zoom &nbsp;|&nbsp; Drag · pan &nbsp;|&nbsp; New City · regenerate</div>
@@ -1025,41 +1081,62 @@ function interAccepts(ix,iy,cls){
   return grid[iy][ix]!==INTER||(interMask[iy][ix]&BIT[cls])!==0;
 }
 
-function nbrs(x,y){
+function nbrs(x,y,opts={}){
   const res=[];
   const sd=dirGrid[y][x],st=grid[y][x];
   const sc=st===INTER?null:st;
+  const ignoreMinor=!!opts.ignoreMinor;
   for(const{dx,dy}of[{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}]){
     const nx=x+dx,ny=y+dy;
     if(!isDrv(nx,ny))continue;
     const dt=grid[ny][nx],dc=dt===INTER?null:dt,dd=dirGrid[ny][nx];
-    if(!dirCompat(sd,dx,dy)||!dirCompat(dd,dx,dy))continue;
-    if(sc&&dc&&!canConnectClass(sc,dc))continue;
-    if(st===INTER&&dc&&!interAccepts(x,y,dc))continue;
-    if(dt===INTER&&sc&&!interAccepts(nx,ny,sc))continue;
-    if(st===INTER&&dt===INTER&&!(interMask[y][x]&interMask[ny][nx]))continue;
+    if(!ignoreMinor){
+      if(!dirCompat(sd,dx,dy)||!dirCompat(dd,dx,dy))continue;
+      if(sc&&dc&&!canConnectClass(sc,dc))continue;
+      if(st===INTER&&dc&&!interAccepts(x,y,dc))continue;
+      if(dt===INTER&&sc&&!interAccepts(nx,ny,sc))continue;
+      if(st===INTER&&dt===INTER&&!(interMask[y][x]&interMask[ny][nx]))continue;
+    }
     res.push({x:nx,y:ny,dx,dy});
   }
   return res;
 }
 
-function moveCost(x,y){
-  switch(grid[y][x]){case HIGHWAY:return 1;case ARTERIAL:return 2;default:return 3;}
+function localDensityPenalty(x,y,occMap){
+  if(!occMap)return 0;
+  let around=0;
+  for(const[dx,dy]of[[0,0],[1,0],[-1,0],[0,1],[0,-1]]){
+    const nx=x+dx,ny=y+dy;
+    if(!inB(nx,ny))continue;
+    around+=occMap.get(oKey(nx,ny))||0;
+  }
+  return around*.28;
 }
 
-function astar(sx,sy,gx,gy){
+function moveCost(x,y,opts={}){
+  let base;
+  switch(grid[y][x]){case HIGHWAY:base=1;break;case ARTERIAL:base=2;break;default:base=3;break;}
+  const occ=opts.occMap;
+  const congestionWeight=opts.congestionWeight??1;
+  const congestion=(occ?(occ.get(oKey(x,y))||0):0)+localDensityPenalty(x,y,occ);
+  return base + congestion*congestionWeight;
+}
+
+function astar(sx,sy,gx,gy,opts={}){
   if(sx===gx&&sy===gy)return[{x:sx,y:sy,dx:0,dy:0}];
   const K=(x,y)=>y*GW+x;
   const open=[{x:sx,y:sy,g:0,f:Math.abs(sx-gx)+Math.abs(sy-gy),dx:0,dy:0}];
   const gs={[K(sx,sy)]:0},fr={};
+  const randomness=opts.randomness??0;
   while(open.length){
     let bi=0;for(let i=1;i<open.length;i++)if(open[i].f<open[bi].f)bi=i;
     const cur=open.splice(bi,1)[0];
     if(cur.x===gx&&cur.y===gy){
       const p=[];let c=cur;while(c){p.unshift(c);c=fr[K(c.x,c.y)]||null;}return p;
     }
-    for(const nb of nbrs(cur.x,cur.y)){
-      const ng=(gs[K(cur.x,cur.y)]||0)+moveCost(nb.x,nb.y);
+    for(const nb of nbrs(cur.x,cur.y,opts)){
+      const noise=randomness>0?Math.random()*randomness:0;
+      const ng=(gs[K(cur.x,cur.y)]||0)+moveCost(nb.x,nb.y,opts)+noise;
       const nk=K(nb.x,nb.y);
       if(ng<(gs[nk]??1e9)){
         gs[nk]=ng;fr[nk]=cur;
@@ -1105,12 +1182,22 @@ class Car{
     this.rx=p.x;this.ry=p.y;this.trx=p.x;this.try=p.y;
     this.angle=Math.atan2(this.dy,this.dx);this.tAngle=this.angle;
     this.lt=1;
+    this.speed=1;
+    this.restartDelay=0;
+    this.stuckTicks=0;
+    this.ignoreMinorTicks=0;
+    this.rerouteTimer=10+(Math.random()*20|0);
+    this.reroutes=0;
+    this.interWaitTicksTotal=0;
+    this.interWaitEvents=0;
+    this.currentInterWait=0;
     // District origin for metrics
     this.originZone=zone[y][x];
   }
   get arrived(){return this.x===this.gx&&this.y===this.gy;}
   nextStep(){return this.path.length?this.path[0]:null;}
   advance(){
+    flushInterWait(this);
     const n=this.path.shift();
     this.dx=n.dx;this.dy=n.dy;this.x=n.x;this.y=n.y;
     const t=grid[n.y][n.x];
@@ -1120,8 +1207,19 @@ class Car{
     this.trx=p.x;this.try=p.y;
     this.tAngle=Math.atan2(n.dy,n.dx);
     this.lt=0;this.travel++;this.stopped=false;
+    this.speed=1;
+    this.stuckTicks=0;
+    this.restartDelay=0;
   }
-  tickStop(){this.stopped=true;this.travel++;}
+  tickStop(atIntersection=false){
+    if(this.speed===1&&this.restartDelay===0)this.restartDelay=1+(Math.random()<.35?1:0);
+    this.speed=0;
+    this.stopped=true;
+    this.travel++;
+    this.stuckTicks++;
+    if(atIntersection)this.currentInterWait++;
+    else flushInterWait(this);
+  }
   update(dt){
     this.lt=Math.min(1,this.lt+dt*9);
     const e=this.lt<.5?2*this.lt*this.lt:-1+(4-2*this.lt)*this.lt;
@@ -1135,12 +1233,20 @@ class Car{
 }
 
 // ─── SIMULATION ───────────────────────────────────────────────────────────────
-const MAX_CARS=180;
+const MAX_CARS=360;
 let drvTilesCache=null;
 let drvByZone={};
+let interQueues=new Map();
 let metricsFrozen=false;
 let fullStopStreak=0;
 const FREEZE_AFTER_FULL_STOP_TICKS=20;
+const DEADLOCK_STUCK_TICKS=16;
+const REROUTE_CONGESTION_THRESHOLD=1.45;
+const REROUTE_MIN_TICKS=14;
+const REROUTE_MAX_TICKS=32;
+const CONGESTION_TILE_THRESHOLD=1.25;
+const HOTSPOT_LIMIT=4;
+const THROUGHPUT_WINDOW_TICKS=120;
 const stopStats={
   noRoute:0,
   blocked:0,
@@ -1148,6 +1254,11 @@ const stopStats={
   intersectionLock:0,
   freezeEvents:0,
 };
+let deadlockRecoveriesTriggered=0;
+let throughputWindow=[];
+let trafficMetrics={};
+let hoveredHotspot=null;
+let hotspotUiSig='';
 
 function resetStopStats(){
   stopStats.noRoute=0;
@@ -1163,6 +1274,180 @@ function recordStop(reason){
   else if(reason==='blocked')stopStats.blocked++;
   else if(reason==='redSignal')stopStats.redSignal++;
   else if(reason==='intersectionLock')stopStats.intersectionLock++;
+}
+
+function decodeKey(k){
+  const x=(k/1000)|0;
+  return{x,y:k-x*1000};
+}
+
+function flushInterWait(car){
+  if(car.currentInterWait>0){
+    car.interWaitTicksTotal+=car.currentInterWait;
+    car.interWaitEvents++;
+    car.currentInterWait=0;
+  }
+}
+
+function resetTrafficMetrics(){
+  deadlockRecoveriesTriggered=0;
+  throughputWindow=[];
+  trafficMetrics={
+    tick:tickN,
+    frozen:metricsFrozen,
+    congestion:{
+      averageCarsPerTile:0,
+      maxCongestion:0,
+      tilesAboveThreshold:0,
+      threshold:CONGESTION_TILE_THRESHOLD,
+    },
+    flow:{
+      averageSpeed:0,
+      movingRatio:0,
+      stoppedRatio:0,
+      throughputWindowTicks:THROUGHPUT_WINDOW_TICKS,
+      throughputCount:0,
+      throughputPerTick:0,
+    },
+    intersection:{
+      averageWaitTicks:0,
+      averageQueueLength:0,
+      maxQueueLength:0,
+      queueLengths:[],
+    },
+    stability:{
+      reroutesPerCar:0,
+      totalReroutes:0,
+      deadlockRecoveriesTriggered:0,
+    },
+    spatial:{
+      hotspots:[],
+    },
+  };
+  window.cityMetrics=trafficMetrics;
+}
+
+function updateTrafficMetrics(occMap,arrivalsThisTick){
+  if(!drvTilesCache)buildDrvCache();
+  throughputWindow.push(arrivalsThisTick);
+  if(throughputWindow.length>THROUGHPUT_WINDOW_TICKS)throughputWindow.shift();
+  const throughputCount=throughputWindow.reduce((s,v)=>s+v,0);
+  const throughputPerTick=throughputWindow.length?throughputCount/throughputWindow.length:0;
+
+  let sumCong=0,maxCong=0,above=0;
+  const hotspotRaw=[];
+  const drvCount=Math.max(1,drvTilesCache.length);
+  const active=cars.length;
+  const avgCarsPerTile=active/drvCount;
+  for(const t of drvTilesCache){
+    const score=(occMap.get(oKey(t.x,t.y))||0)+localDensityPenalty(t.x,t.y,occMap);
+    sumCong+=score;
+    if(score>maxCong)maxCong=score;
+    if(score>CONGESTION_TILE_THRESHOLD)above++;
+    if(score>0)hotspotRaw.push({x:t.x,y:t.y,score});
+  }
+  hotspotRaw.sort((a,b)=>b.score-a.score);
+  const hotspots=hotspotRaw.slice(0,HOTSPOT_LIMIT).map(h=>({x:h.x,y:h.y,score:+h.score.toFixed(2)}));
+
+  const moving=cars.reduce((n,c)=>n+((c.speed>0&&!c.stopped)?1:0),0);
+  const avgSpeed=active?cars.reduce((s,c)=>s+c.speed,0)/active:0;
+  const movingRatio=active?moving/active:0;
+  const stoppedRatio=active?stoppedN/active:0;
+
+  const queueLengths=[];
+  let queueTotal=0,queueMax=0;
+  for(const[k,q]of interQueues.entries()){
+    const pos=decodeKey(k);
+    const len=q.length;
+    queueLengths.push({x:pos.x,y:pos.y,length:len});
+    queueTotal+=len;
+    if(len>queueMax)queueMax=len;
+  }
+  const avgQueueLength=queueLengths.length?queueTotal/queueLengths.length:0;
+
+  let waitTicksTotal=0,waitEventsTotal=0,reroutesTotal=0;
+  const cohort=[...cars,...completed];
+  for(const c of cohort){
+    waitTicksTotal+=c.interWaitTicksTotal+(c.currentInterWait||0);
+    waitEventsTotal+=c.interWaitEvents+(c.currentInterWait>0?1:0);
+    reroutesTotal+=c.reroutes||0;
+  }
+  const reroutesPerCar=cohort.length?reroutesTotal/cohort.length:0;
+  const averageWaitTicks=waitEventsTotal?waitTicksTotal/waitEventsTotal:0;
+
+  trafficMetrics={
+    tick:tickN,
+    frozen:metricsFrozen,
+    congestion:{
+      averageCarsPerTile:avgCarsPerTile,
+      maxCongestion:maxCong,
+      tilesAboveThreshold:above,
+      threshold:CONGESTION_TILE_THRESHOLD,
+    },
+    flow:{
+      averageSpeed:avgSpeed,
+      movingRatio,
+      stoppedRatio,
+      throughputWindowTicks:THROUGHPUT_WINDOW_TICKS,
+      throughputCount,
+      throughputPerTick,
+    },
+    intersection:{
+      averageWaitTicks,
+      averageQueueLength:avgQueueLength,
+      maxQueueLength:queueMax,
+      queueLengths,
+    },
+    stability:{
+      reroutesPerCar,
+      totalReroutes:reroutesTotal,
+      deadlockRecoveriesTriggered,
+    },
+    spatial:{
+      hotspots,
+    },
+  };
+  window.cityMetrics=trafficMetrics;
+}
+
+function buildOccMap(){
+  const m=new Map();
+  for(const c of cars){
+    const k=oKey(c.x,c.y);
+    m.set(k,(m.get(k)||0)+1);
+  }
+  return m;
+}
+
+function pathCongestionAhead(car,occMap){
+  if(!car.path||!car.path.length)return 0;
+  const n=Math.min(6,car.path.length);
+  let total=0;
+  for(let i=0;i<n;i++){
+    const p=car.path[i];
+    total+=localDensityPenalty(p.x,p.y,occMap)+(occMap.get(oKey(p.x,p.y))||0);
+  }
+  return total/n;
+}
+
+function rerouteCar(car,occMap,force=false){
+  const opts={
+    occMap,
+    congestionWeight:1.35,
+    randomness:0.35,
+    ignoreMinor:car.ignoreMinorTicks>0,
+  };
+  if(force){
+    opts.congestionWeight=1.8;
+    opts.randomness=.55;
+  }
+  const p=astar(car.x,car.y,car.gx,car.gy,opts);
+  if(p&&p.length>1){
+    car.path=p.slice(1);
+    car.reroutes=(car.reroutes||0)+1;
+    return true;
+  }
+  return false;
 }
 
 function buildDrvCache(){
@@ -1181,12 +1466,13 @@ function buildDrvCache(){
 function oKey(x,y){return x*1000+y;}
 
 function simReset(){
-  cars=[];completed=[];occupied=new Set();interLocks=new Map();
+  cars=[];completed=[];occupied=new Set();interLocks=new Map();interQueues=new Map();
   tickN=0;stoppedN=0;carId=0;simTime=.25;lastDayTick=0;
   drvTilesCache=null;
   metricsFrozen=false;
   fullStopStreak=0;
   resetStopStats();
+  resetTrafficMetrics();
 }
 
 function currentHour(){return(simTime*24|0)%24;}
@@ -1241,7 +1527,7 @@ function spawnCar(){
     const d=dstPool[Math.random()*dstPool.length|0];
     if(s.x===d.x&&s.y===d.y)continue;
     if(occupied.has(oKey(s.x,s.y)))continue;
-    const path=astar(s.x,s.y,d.x,d.y);
+    const path=astar(s.x,s.y,d.x,d.y,{occMap:buildOccMap(),congestionWeight:1.2,randomness:.25});
     if(!path||path.length<2)continue;
     const c=new Car(s.x,s.y,d.x,d.y,path);
     cars.push(c);occupied.add(oKey(s.x,s.y));return;
@@ -1287,30 +1573,88 @@ function simStep(){
   simTime=(simTime+1/SIM_DAY)%1;
   updateSignals();
   interLocks.clear();stoppedN=0;
+  const occMap=buildOccMap();
+  const activeIds=new Set(cars.map(c=>c.id));
+  for(const[k,v]of interLocks.entries())if(!activeIds.has(v))interLocks.delete(k);
+  for(const[k,q]of interQueues.entries()){
+    const next=q.filter(id=>activeIds.has(id));
+    if(next.length)interQueues.set(k,next);else interQueues.delete(k);
+  }
+  const interPassAxis=new Map();
+  const interPassCount=new Map();
+  let arrivalsThisTick=0;
   // Shuffle for fairness
   for(let i=cars.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[cars[i],cars[j]]=[cars[j],cars[i]];}
 
   for(const c of cars){
     c.stopped=false;
+
+    if(c.ignoreMinorTicks>0)c.ignoreMinorTicks--;
+    c.rerouteTimer--;
+    if(c.rerouteTimer<=0){
+      const pressure=pathCongestionAhead(c,occMap);
+      if(pressure>REROUTE_CONGESTION_THRESHOLD||Math.random()<.08)rerouteCar(c,occMap,pressure>REROUTE_CONGESTION_THRESHOLD);
+      c.rerouteTimer=REROUTE_MIN_TICKS+(Math.random()*(REROUTE_MAX_TICKS-REROUTE_MIN_TICKS)|0);
+    }
+
+    if(c.restartDelay>0){
+      c.restartDelay--;
+      c.tickStop();
+      stoppedN++;
+      if(c.stuckTicks>DEADLOCK_STUCK_TICKS){
+        c.ignoreMinorTicks=8;
+        deadlockRecoveriesTriggered++;
+        rerouteCar(c,occMap,true);
+      }
+      continue;
+    }
+
     let nxt=c.nextStep();
     if(!nxt){
-      if(!c.arrived){const p=astar(c.x,c.y,c.gx,c.gy);if(p&&p.length>1){c.path=p.slice(1);nxt=c.nextStep();}}
+      if(!c.arrived){const p=astar(c.x,c.y,c.gx,c.gy,{occMap,congestionWeight:1.4,randomness:.35,ignoreMinor:c.ignoreMinorTicks>0});if(p&&p.length>1){c.path=p.slice(1);nxt=c.nextStep();}}
       if(!nxt){c.tickStop();recordStop('noRoute');continue;}
     }
     const nk=oKey(nxt.x,nxt.y);
     if(occupied.has(nk)){c.tickStop();recordStop('blocked');continue;}
     if(grid[nxt.y][nxt.x]===INTER){
-      if(!signalAllows(nxt.x,nxt.y,nxt.dx,nxt.dy)){c.tickStop();recordStop('redSignal');continue;}
-      if(interLocks.has(nk)){c.tickStop();recordStop('intersectionLock');continue;}
-      interLocks.set(nk,c.id);
+      if(!signalAllows(nxt.x,nxt.y,nxt.dx,nxt.dy)){c.tickStop(true);recordStop('redSignal');continue;}
+      const q=interQueues.get(nk)||[];
+      if(!q.includes(c.id))q.push(c.id);
+      interQueues.set(nk,q);
+      if(q[0]!==c.id){c.tickStop(true);recordStop('intersectionLock');continue;}
+
+      const axis=nxt.dx!==0?'h':'v';
+      const usedAxis=interPassAxis.get(nk);
+      const passCount=interPassCount.get(nk)||0;
+      const axisCompatible=(passCount===0)||(usedAxis===axis&&passCount<2);
+      if(!axisCompatible){c.tickStop(true);recordStop('intersectionLock');continue;}
+
+      q.shift();
+      if(q.length===0)interQueues.delete(nk);else interQueues.set(nk,q);
+      interPassAxis.set(nk,axis);
+      interPassCount.set(nk,passCount+1);
     }
     occupied.delete(oKey(c.x,c.y));
     c.advance();
     occupied.add(oKey(c.x,c.y));
   }
 
+  for(const c of cars){
+    if(c.stuckTicks>DEADLOCK_STUCK_TICKS&&c.restartDelay===0){
+      c.ignoreMinorTicks=8;
+      deadlockRecoveriesTriggered++;
+      rerouteCar(c,occMap,true);
+    }
+  }
+
   cars=cars.filter(c=>{
-    if(c.arrived){occupied.delete(oKey(c.x,c.y));completed.push(c);return false;}
+    if(c.arrived){
+      flushInterWait(c);
+      occupied.delete(oKey(c.x,c.y));
+      completed.push(c);
+      arrivalsThisTick++;
+      return false;
+    }
     return true;
   });
   // Trim completed array to avoid memory bloat
@@ -1322,6 +1666,7 @@ function simStep(){
     if(fullStopStreak>=FREEZE_AFTER_FULL_STOP_TICKS){
       metricsFrozen=true;
       stopStats.freezeEvents++;
+      updateTrafficMetrics(buildOccMap(),arrivalsThisTick);
       return;
     }
   }else{
@@ -1329,6 +1674,7 @@ function simStep(){
   }
 
   spawnCar();
+  updateTrafficMetrics(buildOccMap(),arrivalsThisTick);
 }
 
 // ─── RENDERING ────────────────────────────────────────────────────────────────
@@ -1600,7 +1946,47 @@ function drawScene(){
   drawBuildings(range);
   drawRoads(range);
   for(const c of cars)drawCar(c);
+  drawHoveredHotspotMarker();
   drawMinimap();
+}
+
+function drawHoveredHotspotMarker(){
+  if(!hoveredHotspot)return;
+  const x=hoveredHotspot.x*CELL+CELL/2;
+  const y=hoveredHotspot.y*CELL+CELL/2;
+  const sx=x*view.zoom+view.panX;
+  const sy=y*view.zoom+view.panY;
+  const t=performance.now()/220;
+  const r=Math.max(3,view.zoom*3.2+Math.sin(t)*1.2);
+  ctx.save();
+  ctx.strokeStyle='rgba(240,180,41,.9)';
+  ctx.lineWidth=1.4;
+  ctx.beginPath();ctx.arc(sx,sy,r+4,0,Math.PI*2);ctx.stroke();
+  ctx.fillStyle='rgba(240,180,41,.95)';
+  ctx.beginPath();ctx.arc(sx,sy,r*.62,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+}
+
+function hotspotSignature(hotspots){
+  return hotspots.map(h=>`${h.x}:${h.y}:${h.score}`).join('|');
+}
+
+function renderHotspotChips(hotspots){
+  const el=document.getElementById('sr-m-hotspots');
+  if(!el)return;
+  if(!hotspots.length){
+    hotspotUiSig='none';
+    hoveredHotspot=null;
+    el.textContent='none';
+    return;
+  }
+  const sig=hotspotSignature(hotspots);
+  if(sig===hotspotUiSig)return;
+  hotspotUiSig=sig;
+  hoveredHotspot=null;
+  el.innerHTML=hotspots.map((h,i)=>
+    `<span class="hotspot-chip" data-x="${h.x}" data-y="${h.y}" title="score ${h.score}">#${i+1} (${h.x},${h.y})</span>`
+  ).join('');
 }
 
 // ─── HUD UPDATES ─────────────────────────────────────────────────────────────
@@ -1631,6 +2017,7 @@ function updateHud(){
 }
 
 function updateStopPanel(){
+  const metrics=trafficMetrics;
   const currentEl=document.getElementById('sr-current');
   if(!currentEl)return;
   currentEl.textContent=stoppedN;
@@ -1639,6 +2026,18 @@ function updateStopPanel(){
   document.getElementById('sr-red').textContent=stopStats.redSignal;
   document.getElementById('sr-lock').textContent=stopStats.intersectionLock;
   document.getElementById('sr-freeze').textContent=stopStats.freezeEvents;
+  if(!metrics||!metrics.congestion)return;
+  document.getElementById('sr-m-cong-avg').textContent=metrics.congestion.averageCarsPerTile.toFixed(2);
+  document.getElementById('sr-m-cong-max').textContent=metrics.congestion.maxCongestion.toFixed(2);
+  document.getElementById('sr-m-cong-hot').textContent=metrics.congestion.tilesAboveThreshold;
+  document.getElementById('sr-m-speed').textContent=metrics.flow.averageSpeed.toFixed(2);
+  document.getElementById('sr-m-move-stop').textContent=`${metrics.flow.movingRatio.toFixed(2)} / ${metrics.flow.stoppedRatio.toFixed(2)}`;
+  document.getElementById('sr-m-throughput').textContent=metrics.flow.throughputCount;
+  document.getElementById('sr-m-int-wait').textContent=metrics.intersection.averageWaitTicks.toFixed(2);
+  document.getElementById('sr-m-int-qmax').textContent=metrics.intersection.maxQueueLength;
+  document.getElementById('sr-m-reroutes').textContent=metrics.stability.reroutesPerCar.toFixed(2);
+  document.getElementById('sr-m-deadlock').textContent=metrics.stability.deadlockRecoveriesTriggered;
+  renderHotspotChips(metrics.spatial.hotspots);
 }
 
 function setStopPanelVisible(visible){
@@ -1703,6 +2102,17 @@ document.getElementById('btn-stop-panel-toggle').onclick=()=>{
 document.getElementById('btn-stop-panel-close').onclick=()=>setStopPanelVisible(false);
 document.getElementById('btn-export-map').onclick=()=>exportMapToFile();
 document.getElementById('btn-import-map').onclick=()=>document.getElementById('map-file-input').click();
+const hotspotList=document.getElementById('sr-m-hotspots');
+hotspotList.addEventListener('mouseover',e=>{
+  const chip=e.target.closest('.hotspot-chip');
+  if(!chip)return;
+  hoveredHotspot={x:Number(chip.dataset.x),y:Number(chip.dataset.y)};
+  hotspotList.querySelectorAll('.hotspot-chip').forEach(n=>n.classList.toggle('on',n===chip));
+});
+hotspotList.addEventListener('mouseleave',()=>{
+  hoveredHotspot=null;
+  hotspotList.querySelectorAll('.hotspot-chip').forEach(n=>n.classList.remove('on'));
+});
 document.getElementById('map-file-input').addEventListener('change',async e=>{
   const file=e.target.files&&e.target.files[0];
   if(!file)return;
