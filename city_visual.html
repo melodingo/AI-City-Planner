@@ -157,6 +157,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <button class="hbtn" id="btn-zin">+</button>
     <button class="hbtn" id="btn-pause">Pause</button>
     <button class="hbtn" id="btn-regen">New City</button>
+    <button class="hbtn" id="btn-export-map">Export Map</button>
+    <button class="hbtn" id="btn-import-map">Import Map</button>
     <button class="hbtn" id="btn-ai-train">Train AI</button>
     <button class="hbtn" id="btn-ai-stop" disabled>Stop AI</button>
     <button class="hbtn" id="btn-ai-apply" disabled>Apply AI Layout</button>
@@ -192,6 +194,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <div id="gen-meta"></div>
   </div>
 </div>
+
+<input id="map-file-input" type="file" accept="application/json,.json" style="display:none" />
 </div>
 
 <script>
@@ -318,6 +322,69 @@ function parkNeighbourCount(x,y){
     if(inB(nx,ny)&&zone[ny][nx]===Z.PARK)n++;
   }
   return n;
+}
+
+function clone2d(arr){
+  return arr.map(row=>row.slice());
+}
+
+function exportMapState(){
+  return {
+    format: 'CityFlowMap',
+    version: 'V5.1',
+    width: GW,
+    height: GH,
+    grid: clone2d(grid),
+    dirGrid: clone2d(dirGrid),
+    interMask: clone2d(interMask),
+    zone: clone2d(zone),
+    cityMask: clone2d(cityMask),
+    buildingCache: JSON.parse(JSON.stringify(buildingCache)),
+  };
+}
+
+function restoreMapState(state){
+  if(!state || state.format !== 'CityFlowMap'){
+    throw new Error('Invalid map file');
+  }
+  if(state.width !== GW || state.height !== GH){
+    throw new Error(`Map size must be ${GW}x${GH}`);
+  }
+
+  grid = clone2d(state.grid);
+  dirGrid = clone2d(state.dirGrid);
+  interMask = clone2d(state.interMask);
+  zone = clone2d(state.zone);
+  cityMask = clone2d(state.cityMask);
+  buildingCache = JSON.parse(JSON.stringify(state.buildingCache || []));
+
+  simReset();
+  tickAccum = 0;
+  lastT = performance.now();
+  buildDrvCache();
+  resetView();
+  document.getElementById('gen-overlay').style.display='none';
+  setTimeout(()=>{document.getElementById('zoom-tip').style.opacity='0';},4000);
+}
+
+function exportMapToFile(){
+  const data = JSON.stringify(exportMapState(), null, 2);
+  const blob = new Blob([data], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  const stamp = new Date().toISOString().replace(/[:.]/g,'-');
+  link.href = url;
+  link.download = `cityflow-map-${stamp}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+async function importMapFromFile(file){
+  const text = await file.text();
+  const state = JSON.parse(text);
+  restoreMapState(state);
 }
 
 // ─── CITY GENERATION ──────────────────────────────────────────────────────────
@@ -1541,6 +1608,25 @@ document.getElementById('btn-zin').onclick=()=>zoomAt(canvas.width/2,canvas.heig
 document.getElementById('btn-zout').onclick=()=>zoomAt(canvas.width/2,canvas.height/2,.87);
 document.getElementById('btn-zreset').onclick=()=>resetView();
 document.getElementById('btn-regen').onclick=()=>startCity();
+document.getElementById('btn-export-map').onclick=()=>exportMapToFile();
+document.getElementById('btn-import-map').onclick=()=>document.getElementById('map-file-input').click();
+document.getElementById('map-file-input').addEventListener('change',async e=>{
+  const file=e.target.files&&e.target.files[0];
+  if(!file)return;
+  document.getElementById('gen-overlay').style.display='flex';
+  document.getElementById('gen-phase').textContent='Importing map';
+  document.getElementById('gen-bar-fill').style.width='100%';
+  document.getElementById('gen-meta').textContent=file.name;
+  try{
+    await importMapFromFile(file);
+  }catch(err){
+    document.getElementById('gen-phase').textContent='Import failed';
+    document.getElementById('gen-meta').textContent=err.message || 'Invalid map file';
+    setTimeout(()=>{document.getElementById('gen-overlay').style.display='none';},1800);
+    return;
+  }
+  e.target.value='';
+});
 
 // AI training UI scaffold (frontend only for now)
 const ai={
