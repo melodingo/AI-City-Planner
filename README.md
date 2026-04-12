@@ -1,110 +1,122 @@
 # AI City Planner
 
-A city-generation and traffic-simulation project focused on turning simple grid logic into something that feels like a real place. The repository contains two related systems:
+Procedural city generation and traffic simulation, built to explore how road hierarchy, frontage rules, and congestion interact in a believable urban layout.
 
-1. A browser-based city generator and live traffic visualizer in `city_visual.html`.
-2. A Python city grid, traffic engine, and pygame renderer for simulation, testing, and reinforcement-learning experiments.
+The repository contains two connected systems:
 
-The project is built around the same core idea in both implementations: create a believable road network, place development where roads make sense, then measure how traffic behaves once the city is active.
+- `city_visual.html` - a browser-based city generator with live traffic, tuning controls, and a highly visual rendering pass.
+- The Python stack - a grid model, traffic engine, renderer, and Gym-style environment for simulation and experimentation.
 
-## Highlights
+The main design goal is simple: make the city feel like a city. Roads should create districts, houses should gather where roads support them, and traffic should reveal whether the layout actually works.
 
-- Generates a layered road hierarchy with highways, main roads, local roads, and intersections.
-- Builds denser residential districts by favoring local-road frontage.
-- Uses A* pathfinding so cars can route across the road network automatically.
-- Tracks traffic metrics such as active cars, completed cars, stopped cars, and average travel time.
-- Includes a closable tuning panel in the browser version so generation settings do not block the map.
-- Supports both visual simulation and headless execution from Python.
-- Provides a Gym-style environment wrapper that can be adapted for reinforcement learning.
+## Quick Links
 
-## What This Project Is Trying to Model
+- [Overview](#overview)
+- [How It Works](#how-it-works)
+- [Browser Simulation](#browser-simulation)
+- [Python Simulation Stack](#python-simulation-stack)
+- [Key Variables](#key-variables)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Project Notes](#project-notes)
 
-The goal is not just to draw roads. It is to approximate the structure of a living city:
+## Overview
 
-- Major roads organize large-scale movement.
-- Main roads distribute traffic into districts.
-- Local roads form the dense neighborhood network where housing is concentrated.
-- Buildings should cluster along road frontage instead of filling the map randomly.
-- Traffic should reveal how road hierarchy affects movement and congestion.
+This project is built around a layered urban model:
 
-The browser version takes this idea further by stamping local-road districts and pushing housing density hard enough to create neighborhood-scale blocks rather than isolated buildings.
+- highways establish the long-range structure,
+- main roads distribute flow into the city,
+- local roads form dense residential networks,
+- buildings cluster along frontage instead of filling the map uniformly,
+- cars move through the network using pathfinding and collision-aware movement.
 
-## Repository Layout
+The browser version goes further by using explicit local-road district stamping and dense housing backfill so neighborhoods read as compact blocks instead of isolated tiles.
 
-- `city_visual.html` - Full browser-based city generator, building placer, and traffic visualizer.
-- `grid.py` - Grid representation and helper methods for the Python simulation.
-- `traffic_sim.py` - A* routing, car behavior, and the simulation engine.
-- `environment.py` - Gym-style environment wrapper for RL experiments.
-- `visualize.py` - pygame renderer for the Python simulation.
-- `main.py` - Command-line entry point for visual, headless, and environment test modes.
-- `requirements.txt` - Python dependencies.
+## What Makes It Interesting
 
-## Browser City Generator
+- It is not just a road generator. It is a road-and-development system.
+- It is not just a traffic sim. It measures whether the road plan actually functions.
+- It uses the same core city logic in two forms: a visual HTML canvas version and a Python simulation stack.
+- It exposes tunable variables so different city styles can be created without rewriting the generator.
 
-The browser simulation in `city_visual.html` is the most visually ambitious part of the project. It renders a procedural city on a canvas and includes interactive controls for speed, zoom, and generation tuning.
+## How It Works
 
-### Road Hierarchy
+The project separates generation into stages:
 
-The browser generator distinguishes four road classes:
+1. Build a city boundary mask.
+2. Seed highways from the map edges.
+3. Branch main roads from the highway network.
+4. Grow local roads from the main network and from local neighborhoods.
+5. Place buildings using frontage rules and local-density bias.
+6. Spawn cars, route them through the network, and track traffic metrics.
 
-- `LOCAL` - neighborhood streets and residential loops.
-- `MAIN` - larger collectors that feed into highways.
-- `HIGHWAY` - long-distance arterial corridors.
+That structure is what makes the output feel layered rather than random.
+
+## Browser Simulation
+
+The browser version in `city_visual.html` is the most complete presentation of the project. It renders the city on a canvas and includes a tuning panel so the layout can be adjusted in real time.
+
+### Road Classes
+
+The browser generator uses four road states:
+
+- `LOCAL` - neighborhood roads and residential loops.
+- `MAIN` - distributor roads that connect districts.
+- `HIGHWAY` - long-distance arterial routes.
 - `INTER` - intersections and junctions.
 
-Road generation is intentionally hierarchical. Highways seed the network first, main roads branch off them, and local roads branch from the main network and from other local roads to create compact district patterns.
+This hierarchy matters because it controls both the city shape and how buildings are allowed to appear.
 
-### Building Generation Approach
+### Building Logic
 
-Buildings are not placed randomly across all empty tiles. They are only placed where frontage rules allow them, with strong bias toward local roads. The generator checks nearby road classes, then decides whether a lot should remain open, become a house, or occasionally become a park or tower in denser pockets.
+Buildings are placed only where road frontage makes sense. Local roads are strongly preferred, main-road frontage is capped more aggressively, and dense local pockets receive extra infill.
 
-This is important for the visual result: the city reads as neighborhoods, not as a uniform checkerboard.
+That means the city can produce patterns like:
 
-### Core Browser Tuning Variables
+- local road, house, house, local road,
+- residential blocks with occasional gaps,
+- denser clusters near active local networks,
+- rare parks or taller structures inside crowded areas.
 
-The tuning panel exposes the main generation controls. These are the most important variables if you want to change density or road style.
+### UI Controls
 
-#### Highway Controls
+The browser interface includes:
 
-- `highwaySeeds` - Number of edge seeds used to start highway growth.
-- `highwayMinLenRatio` - Minimum highway length relative to map size.
-- `highwayMaxLenMult` - Maximum highway length multiplier.
+- simulation speed buttons,
+- zoom in, zoom out, and reset view,
+- panning by dragging,
+- pause and resume,
+- a closable generation tuning panel,
+- a generation progress overlay while the map is being built.
 
-#### Main Road Controls
+## Key Variables
 
-- `mainBranchCap` - Maximum number of main-road branches.
-- `mainFromHighwayFactor` - How aggressively main roads branch from highways.
-- `mainSkipChance` - Chance to skip a potential main-road branch.
+These are the knobs that matter most if you want to explain or evolve the generator.
 
-#### Local Road Controls
-
-- `localBaseCap` - Base cap for total local-road growth.
-- `localAreaFactor` - Local-road growth based on map area.
-- `localFromMainFactor` - Local-road growth based on main-road length.
-- `localBranchExtra` - Extra branching allowed from local roads.
-- `localLoopChance` - Chance to form small local loops.
-
-#### Housing and Cleanup Controls
-
-- `houseSpawnMult` - Multiplier that boosts the final probability of placing buildings.
-- `localFrontageBias` - Extra preference for lots facing local roads.
-- `nearLocalBiasCap` - Upper limit on bonus density from nearby local roads.
-- `mainFrontageCap` - Maximum density allowed on main-road frontage.
-- `infillChance` - Chance to fill leftover gaps inside active local neighborhoods.
-- `edgePruneLocal` - How aggressively local roads are removed near map edges.
-- `edgePruneMain` - How aggressively main roads are removed near map edges.
-
-### Browser UI Controls
-
-- Speed buttons: `0.5x`, `1x`, and `3x`.
-- Zoom controls: zoom in, zoom out, and reset view.
-- Pause toggle.
-- Closable generation tuning panel.
-- Generation progress overlay during map creation.
+| Variable | Meaning | Effect |
+| --- | --- | --- |
+| `highwaySeeds` | Number of highway entry points | Higher values create more regional structure |
+| `highwayMinLenRatio` | Minimum highway length relative to map size | Higher values force longer trunk lines |
+| `highwayMaxLenMult` | Maximum highway growth multiplier | Higher values let highways stretch further |
+| `mainBranchCap` | Cap on main-road branching | Higher values create a larger collector network |
+| `mainFromHighwayFactor` | Branch density from highways | Higher values push more main roads outward |
+| `mainSkipChance` | Chance to skip a main-road branch | Lower values make main roads more continuous |
+| `localBaseCap` | Base local-road budget | Higher values create more neighborhood roads |
+| `localAreaFactor` | Local-road budget tied to map area | Higher values scale local density up globally |
+| `localFromMainFactor` | Local-road budget tied to main roads | Higher values create stronger district growth |
+| `localBranchExtra` | Extra branching from local roads | Higher values make districts more tangled and complete |
+| `localLoopChance` | Chance to create local loops | Higher values make neighborhoods feel less grid-like |
+| `houseSpawnMult` | Housing placement multiplier | Higher values increase fill across valid lots |
+| `localFrontageBias` | Preference for local-road frontage | Higher values push more housing onto local streets |
+| `nearLocalBiasCap` | Cap on nearby-local density bonus | Higher values spread density deeper into districts |
+| `mainFrontageCap` | Ceiling for main-road frontage density | Lower values keep main streets less residential |
+| `infillChance` | Chance to fill remaining local gaps | Higher values reduce holes inside neighborhoods |
+| `edgePruneLocal` | Edge cleanup for local roads | Higher values trim local roads near borders more aggressively |
+| `edgePruneMain` | Edge cleanup for main roads | Higher values trim main roads near borders more aggressively |
 
 ## Python Simulation Stack
 
-The Python side of the project is designed for simulation, debugging, and experimentation.
+The Python side is focused on clean simulation logic, testing, and future ML experimentation.
 
 ### `grid.py`
 
@@ -113,7 +125,7 @@ The Python side of the project is designed for simulation, debugging, and experi
 - reading and writing cell types,
 - checking bounds,
 - finding drivable neighbors,
-- generating preset grid cities,
+- creating preset grid-style cities,
 - generating random stress-test layouts.
 
 Cell types used by the Python stack:
@@ -125,21 +137,21 @@ Cell types used by the Python stack:
 
 ### `traffic_sim.py`
 
-This module contains the actual traffic engine.
+This is the core simulation engine.
 
-Main responsibilities:
+It handles:
 
-- A* pathfinding over the road graph.
-- Spawning cars at random drivable tiles.
-- Advancing cars one tick at a time.
-- Preventing collisions using an occupancy set.
-- Limiting intersections to one entering car per tick.
-- Tracking per-tick metrics.
+- A* pathfinding,
+- spawning cars on drivable tiles,
+- advancing cars one tick at a time,
+- collision prevention through occupancy tracking,
+- one-car-per-intersection-per-tick behavior,
+- metrics collection for rendering and analysis.
 
-#### SimulationEngine Parameters
+#### Important Parameters
 
-- `max_cars` - Maximum number of active cars allowed at once.
-- `spawn_rate` - Probability of spawning a new car each tick.
+- `max_cars` - maximum number of active cars allowed at once.
+- `spawn_rate` - probability of spawning a new car each tick.
 
 #### Car State
 
@@ -150,13 +162,13 @@ Each car tracks:
 - `destination` - target tile,
 - `path` - remaining route,
 - `travel_time` - total ticks since spawn,
-- `stopped` - whether the car could not move on the current tick,
-- `waiting_at_intersection` - queue time spent blocked at intersections.
+- `stopped` - whether movement was blocked on the current tick,
+- `waiting_at_intersection` - queue time spent waiting at junctions.
 
 #### Metrics Returned by the Engine
 
 - `tick` - current simulation tick.
-- `active_cars` - number of cars currently in motion.
+- `active_cars` - number of cars currently moving.
 - `completed_cars` - number of cars that reached their destination.
 - `avg_travel_time` - average travel time across active and completed cars.
 - `stopped_cars` - number of cars that could not move on the latest tick.
@@ -164,7 +176,7 @@ Each car tracks:
 
 ### `environment.py`
 
-This file wraps the simulation in a Gym-style interface suitable for reinforcement learning.
+This file wraps the simulation in a Gym-style environment.
 
 #### Observation Space
 
@@ -182,31 +194,29 @@ Actions are encoded as a discrete integer:
 - `1` - upgrade to highway
 - `2` - add intersection
 
-The tile index is packed into the same integer, so the environment can scale with grid size.
+The tile index is packed into the same integer, which keeps the interface scalable with grid size.
 
 #### Reward Function
 
 The reward is shaped to penalize inefficient or congested layouts:
 
 - average travel time penalty,
-- stopped car penalty,
+- stopped-car penalty,
 - congestion penalty,
 - build penalty when the action changes the grid.
 
-This makes the environment useful for optimization experiments, even though it is not yet wired into a full RL training pipeline.
+This makes the environment useful as a prototype for optimization or RL experiments.
 
 ### `visualize.py`
 
-This module provides a pygame renderer for the Python simulation.
+This module provides the pygame renderer for the Python simulation.
 
 It draws:
 
 - the underlying city grid,
 - congestion overlays,
 - vehicles,
-- a small HUD with current metrics.
-
-If pygame is not installed, the script exits cleanly with an installation message.
+- a HUD with current metrics.
 
 ### `main.py`
 
@@ -214,17 +224,17 @@ This is the command-line entry point.
 
 Available run modes:
 
-- Visual mode: opens the pygame renderer.
-- Headless mode: runs the simulation without a display and prints metrics.
-- Environment test mode: exercises the Gym-style wrapper with random actions.
+- Visual mode - opens the pygame renderer.
+- Headless mode - runs the simulation without a display and prints metrics.
+- Environment test mode - exercises the Gym-style wrapper with random actions.
 
 ## Installation
 
 ### Requirements
 
 - Python 3.10 or newer recommended.
-- `pygame` for the visual Python simulation.
 - `numpy` for the grid and environment logic.
+- `pygame` for the visual Python simulation.
 
 ### Install Dependencies
 
@@ -232,7 +242,7 @@ Available run modes:
 pip install -r requirements.txt
 ```
 
-If you only want to use the browser version, you do not need the Python dependencies.
+If you only want the browser version, the Python dependencies are optional.
 
 ## Usage
 
@@ -254,15 +264,11 @@ Use the on-screen controls to:
 python main.py
 ```
 
-This launches the pygame version of the simulation.
-
 ### Python Headless Mode
 
 ```bash
 python main.py --mode headless --ticks 500
 ```
-
-This runs the simulation without a window and prints periodic metrics to the terminal.
 
 ### Environment Smoke Test
 
@@ -270,73 +276,57 @@ This runs the simulation without a window and prints periodic metrics to the ter
 python main.py --mode envtest --ticks 50
 ```
 
-This runs the Gym-style wrapper with random actions and prints a simple diagnostic summary.
+## Project Notes
 
-## Simulation Parameters Worth Tuning
+### Why the Browser Version Looks Different
 
-If you are using this project as a portfolio piece, these are the variables that matter most when describing the design.
+The browser generator is tuned to create stronger neighborhood density than a simple random fill approach. The important part is not just road probability. It is the interaction between:
 
-### Road Structure
+- explicit local-road districts,
+- frontage-aware housing placement,
+- dense infill inside active neighborhoods,
+- restrained main-road housing,
+- and cleanup rules that preserve the district structure.
 
-- Increase `highwaySeeds` for more citywide corridors.
-- Increase `mainBranchCap` and `mainFromHighwayFactor` to create a larger collector network.
-- Increase `localBaseCap`, `localAreaFactor`, and `localBranchExtra` to produce denser neighborhoods.
-- Increase `localLoopChance` to create more organic block structure.
+### Why the Python Version Still Matters
 
-### Residential Density
+The Python stack is a cleaner simulation core. It is useful when you want:
 
-- Increase `houseSpawnMult` to make empty lots more likely to fill.
-- Increase `localFrontageBias` to push more housing onto local roads.
-- Increase `nearLocalBiasCap` to let neighborhood density spread inward from local road frontage.
-- Increase `infillChance` to reduce empty gaps inside dense districts.
-- Lower `mainFrontageCap` if you want main-road parcels to stay sparse.
+- reproducible test runs,
+- terminal-based debugging,
+- a pygame rendering path,
+- or a stepping stone toward reinforcement learning.
 
-### Cleanup Behavior
+### Design Tradeoffs
 
-- Lower `edgePruneLocal` and `edgePruneMain` if you want the city to keep more edge structure.
-- Raise them if you want a more trimmed, centralized city footprint.
-
-## Design Notes
-
-A few implementation choices shape the look and behavior of the project:
-
-- Roads are drawn from the rasterized grid rather than from raw path vertices, which keeps the visual output aligned with the actual simulation state.
-- Local housing is best produced by explicit district stamping and local-road neighborhoods rather than by trying to brute-force road randomness.
-- Intersections are treated as special junction tiles so routing can handle merges and crossing points cleanly.
-- Cars occupy one tile at a time, which keeps collision logic simple and makes congestion readable.
-- The project intentionally separates visual presentation from simulation logic so the browser and Python versions can evolve independently.
+- Roads are drawn from the rasterized grid rather than raw path vertices, which keeps the visualization aligned with the simulation state.
+- Cars occupy one tile at a time, which keeps collision logic simple and readable.
+- The browser and Python systems are separate, which keeps each implementation focused on its own strengths.
+- The project favors legibility and urban feel over strict real-world accuracy.
 
 ## Portfolio Angle
 
-This project demonstrates more than procedural graphics. It combines:
+This project demonstrates procedural generation, urban layout heuristics, simulation, pathfinding, interactive visualization, and tunable system design in a single package.
 
-- procedural generation,
-- urban layout heuristics,
-- traffic simulation,
-- A* pathfinding,
-- interactive visualization,
-- parameter tuning,
-- and a Gym-style environment for future ML work.
+It is a strong portfolio piece because it shows that the code is not only functional, but also designed around a clear visual and behavioral goal.
 
-That combination makes it useful as a portfolio piece because it shows both systems thinking and visual polish.
+## Limitations
 
-## Known Limitations
+- The browser and Python implementations are not a single shared engine.
+- The RL environment is a scaffold, not a finished training pipeline.
+- City quality still depends on generation settings and random seed.
+- The project is optimized for experimentation and presentation, not geographic realism.
 
-- The browser and Python implementations are separate, not a single shared engine.
-- The RL environment is a scaffold rather than a fully trained agent setup.
-- City quality is heavily influenced by tuning, so generated layouts can vary a lot between runs.
-- The project is optimized for readability and experimentation, not real-world urban accuracy.
+## Next Steps
 
-## Suggested Next Steps
-
-If you want to take the project further, the most natural upgrades are:
+Possible upgrades from here:
 
 - add saved presets for different city styles,
-- expose the browser tuning panel as named profiles,
-- add better district zoning types,
-- make the Python environment compatible with a full Gymnasium wrapper,
+- expose named generation profiles,
+- add explicit district types beyond simple residential density,
+- build a full Gymnasium wrapper,
 - collect benchmark metrics over repeated seeds,
-- export screenshots or animated runs for portfolio presentation.
+- export screenshots or short clips for portfolio use.
 
 ## License
 
