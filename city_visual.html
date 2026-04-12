@@ -58,6 +58,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 }
 .hbtn:hover{color:var(--accent);background:rgba(240,180,41,.05)}
 .hbtn.on{color:var(--accent);background:rgba(240,180,41,.08)}
+.hbtn:disabled{opacity:.45;cursor:not-allowed}
 
 /* canvas area */
 #world-wrap{flex:1;position:relative;overflow:hidden;cursor:grab}
@@ -91,6 +92,13 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 }
 #zoom-tip{bottom:13px;left:50%;transform:translateX(-50%);font-size:9px;
   color:var(--dim);letter-spacing:.1em;pointer-events:none;transition:opacity .5s}
+
+#ai-panel{top:13px;right:13px;min-width:230px}
+#ai-title{font-size:9px;letter-spacing:.12em;color:var(--accent);margin-bottom:6px}
+#ai-state{font-size:9px;color:var(--text);margin-bottom:6px}
+#ai-bar{height:3px;background:#1e2330;overflow:hidden;margin-bottom:6px}
+#ai-bar-fill{height:100%;width:0%;background:var(--green);transition:width .2s}
+#ai-meta{font-size:8px;color:var(--dim);letter-spacing:.05em}
 
 /* generation overlay */
 #gen-overlay{
@@ -136,6 +144,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <button class="hbtn" id="btn-zin">+</button>
     <button class="hbtn" id="btn-pause">Pause</button>
     <button class="hbtn" id="btn-regen">New City</button>
+    <button class="hbtn" id="btn-ai-train">Train AI</button>
+    <button class="hbtn" id="btn-ai-stop" disabled>Stop AI</button>
+    <button class="hbtn" id="btn-ai-apply" disabled>Apply AI Layout</button>
   </div>
 </div>
 
@@ -149,6 +160,12 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <div class="leg"><div class="lsw" style="width:10px;height:10px;background:#2a5c3a;border-radius:2px"></div>Park / Green</div>
     <div class="leg"><div class="lsw" style="width:8px;height:8px;border-radius:50%;background:#f0b429"></div>Moving car</div>
     <div class="leg"><div class="lsw" style="width:8px;height:8px;border-radius:50%;background:#e05555"></div>Stopped car</div>
+  </div>
+  <div class="panel" id="ai-panel">
+    <div id="ai-title">AI OPTIMIZER</div>
+    <div id="ai-state">Idle. Train to start learning traffic-aware edits.</div>
+    <div id="ai-bar"><div id="ai-bar-fill"></div></div>
+    <div id="ai-meta">Epoch 0/0 | best score n/a</div>
   </div>
   <div class="panel" id="zoom-tip" style="bottom:13px;left:50%;transform:translateX(-50%)">Scroll · zoom &nbsp;|&nbsp; Drag · pan &nbsp;|&nbsp; New City · regenerate</div>
 </div>
@@ -1476,6 +1493,98 @@ document.getElementById('btn-zin').onclick=()=>zoomAt(canvas.width/2,canvas.heig
 document.getElementById('btn-zout').onclick=()=>zoomAt(canvas.width/2,canvas.height/2,.87);
 document.getElementById('btn-zreset').onclick=()=>resetView();
 document.getElementById('btn-regen').onclick=()=>startCity();
+
+// AI training UI scaffold (frontend only for now)
+const ai={
+  training:false,
+  epochs:0,
+  totalEpochs:28,
+  bestScore:Infinity,
+  currentScore:Infinity,
+  timer:null,
+  policyReady:false,
+};
+
+function aiEl(id){return document.getElementById(id);}
+
+function aiSetButtons(){
+  aiEl('btn-ai-train').disabled=ai.training;
+  aiEl('btn-ai-stop').disabled=!ai.training;
+  aiEl('btn-ai-apply').disabled=ai.training||!ai.policyReady;
+}
+
+function aiSetStatus(state,meta,pct){
+  aiEl('ai-state').textContent=state;
+  aiEl('ai-meta').textContent=meta;
+  aiEl('ai-bar-fill').style.width=clamp(pct,0,100)+'%';
+}
+
+function aiFinishTraining(completed){
+  if(ai.timer){clearInterval(ai.timer);ai.timer=null;}
+  ai.training=false;
+  ai.policyReady=completed;
+  if(completed){
+    aiSetStatus(
+      'Training complete. Mock policy is ready to apply.',
+      `Epoch ${ai.epochs}/${ai.totalEpochs} | best score ${ai.bestScore.toFixed(2)}`,
+      100
+    );
+  }else{
+    aiSetStatus(
+      'Training stopped. Current mock policy was discarded.',
+      `Epoch ${ai.epochs}/${ai.totalEpochs} | no policy exported`,
+      (ai.epochs/ai.totalEpochs)*100
+    );
+  }
+  aiSetButtons();
+}
+
+function aiStartTraining(){
+  if(ai.training)return;
+  ai.training=true;
+  ai.policyReady=false;
+  ai.epochs=0;
+  ai.bestScore=Infinity;
+  ai.currentScore=Infinity;
+  aiSetButtons();
+  aiSetStatus('Training AI planner (mock)...','Epoch 0/'+ai.totalEpochs+' | best score n/a',0);
+
+  ai.timer=setInterval(()=>{
+    ai.epochs++;
+    const trend=(ai.totalEpochs-ai.epochs)/ai.totalEpochs;
+    ai.currentScore=18+trend*55+Math.random()*7;
+    if(ai.currentScore<ai.bestScore)ai.bestScore=ai.currentScore;
+    const pct=(ai.epochs/ai.totalEpochs)*100;
+    aiSetStatus(
+      'Training AI planner (mock)...',
+      `Epoch ${ai.epochs}/${ai.totalEpochs} | best score ${ai.bestScore.toFixed(2)}`,
+      pct
+    );
+    if(ai.epochs>=ai.totalEpochs)aiFinishTraining(true);
+  },250);
+}
+
+async function aiApplyLayout(){
+  if(ai.training)return;
+  if(!ai.policyReady){
+    aiSetStatus('No trained policy yet.','Press "Train AI" first.',0);
+    return;
+  }
+  aiSetStatus('Applying AI layout (mock)...','Regenerating city with learned edits placeholder.',100);
+  aiEl('btn-ai-apply').disabled=true;
+  await startCity();
+  aiSetStatus(
+    'AI layout applied (mock).',
+    'City regenerated. Compare congestion and avg trip against previous run.',
+    100
+  );
+  aiEl('btn-ai-apply').disabled=false;
+}
+
+aiEl('btn-ai-train').onclick=()=>aiStartTraining();
+aiEl('btn-ai-stop').onclick=()=>aiFinishTraining(false);
+aiEl('btn-ai-apply').onclick=()=>{aiApplyLayout();};
+aiSetButtons();
 
 // ─── MAIN LOOP ────────────────────────────────────────────────────────────────
 function loop(ts){

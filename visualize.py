@@ -55,7 +55,8 @@ class CityRenderer:
                  grid: CityGrid,
                  cell_size: int = 32,
                  fps: int = 10,
-                 show_congestion: bool = True):
+                 show_congestion: bool = True,
+                 title: str = "City Traffic Simulation"):
 
         self.grid             = grid
         self.cell_size        = max(cell_size, MIN_CELL_PX)
@@ -68,7 +69,7 @@ class CityRenderer:
         pygame.init()
         self.screen  = pygame.display.set_mode((self.screen_w, self.screen_h))
         self.clock   = pygame.time.Clock()
-        pygame.display.set_caption("City Traffic Simulation")
+        pygame.display.set_caption(title)
 
         # Surface for semi-transparent congestion overlay
         self._overlay = pygame.Surface(
