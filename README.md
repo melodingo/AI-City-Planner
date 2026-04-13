@@ -19,6 +19,22 @@ Most city demos stop at map generation. This project focuses on the full loop:
 
 That gives a practical baseline for future RL or search-based planning policies.
 
+## Latest Updates (Apr 2026)
+
+### Browser release V6.3
+
+- Merged optimized rendering with offscreen caching for ground, buildings, roads, and minimap roads.
+- Replaced linear-scan A* frontier selection with a binary-heap priority queue.
+- Removed per-tick full car sorting in favor of a linear-time prioritized drive-order pass.
+- Added precomputed signal-intersection cache to avoid full-map light updates each tick.
+- Throttled HUD updates and refreshed release metadata/UI labels to V6.3.
+
+### Browser release V6.2
+
+- Stabilized highway spacing with stronger dominant-axis corridor separation.
+- Reduced near-parallel shifted highway artifacts.
+- Preserved sparse ramp spacing and highway-favoring travel costs.
+
 ## High-Level Architecture
 
 ```mermaid
@@ -71,7 +87,7 @@ sequenceDiagram
     participant CLI as main.py
     participant Grid as CityGrid
     participant Sim as SimulationEngine
-    participant Opt as Hill Climber
+  participant Search as HillClimber
 
     CLI->>Grid: make_city(layout)
     CLI->>Sim: initialize(grid)
@@ -79,9 +95,9 @@ sequenceDiagram
         Sim->>Sim: step()
         Sim-->>CLI: metrics snapshot
     end
-    CLI->>Opt: evaluate + mutate candidates
-    Opt->>Grid: apply_random_edit()
-    Opt-->>CLI: improved grid/score
+    CLI->>Search: evaluate and mutate candidates
+    Search->>Grid: apply_random_edit()
+    Search-->>CLI: improved grid/score
 ```
 
 ## Data Model Summary
@@ -121,7 +137,7 @@ The current optimizer is a hill-climbing search in `main.py`:
 Current objective score (lower is better):
 
 $$
-	ext{score} = 1.0\cdot\overline{travel} + 2.0\cdot\overline{stopped} + 40.0\cdot\overline{congestion}
+  ext{score} = 1.0\cdot\overline{travel} + 2.0\cdot\overline{stopped} + 40.0\cdot\overline{congestion}
 $$
 
 ## CLI Usage
