@@ -2274,6 +2274,93 @@ function drawSignalDots(range){
   }
 }
 
+function drawRoadsLive(range){
+  const links=[];
+  const{x0,y0,x1,y1}=range;
+  for(let y=y0;y<y1;y++){
+    for(let x=x0;x<x1;x++){
+      if(!isDrv(x,y))continue;
+      if(isDrv(x+1,y))links.push({ax:x,ay:y,bx:x+1,by:y});
+      if(isDrv(x,y+1))links.push({ax:x,ay:y,bx:x,by:y+1});
+    }
+  }
+
+  function maxClass(ax,ay,bx,by){
+    const a=roadClassAt(ax,ay)||LOCAL,b=roadClassAt(bx,by)||LOCAL;
+    return Math.max(a,b);
+  }
+
+  links.sort((a,b)=>maxClass(a.ax,a.ay,a.bx,a.by)-maxClass(b.ax,b.ay,b.bx,b.by));
+
+  const scale=view.zoom;
+
+  for(const l of links){
+    const rt=maxClass(l.ax,l.ay,l.bx,l.by);
+    const hw=RHW[rt]*scale;
+    const A={x:l.ax*CELL*scale+view.panX+(CELL/2)*scale,y:l.ay*CELL*scale+view.panY+(CELL/2)*scale};
+    const B={x:l.bx*CELL*scale+view.panX+(CELL/2)*scale,y:l.by*CELL*scale+view.panY+(CELL/2)*scale};
+    ctx.beginPath();ctx.moveTo(A.x,A.y);ctx.lineTo(B.x,B.y);
+    ctx.lineWidth=hw*2+4*scale;ctx.strokeStyle='rgba(0,0,0,.35)';
+    ctx.lineCap='round';ctx.stroke();
+  }
+
+  for(const l of links){
+    const rt=maxClass(l.ax,l.ay,l.bx,l.by);
+    const hw=RHW[rt]*scale;
+    const col=rt===HIGHWAY?COL.roadHighway:rt===ARTERIAL?COL.roadArterial:COL.roadLocal;
+    const A={x:l.ax*CELL*scale+view.panX+(CELL/2)*scale,y:l.ay*CELL*scale+view.panY+(CELL/2)*scale};
+    const B={x:l.bx*CELL*scale+view.panX+(CELL/2)*scale,y:l.by*CELL*scale+view.panY+(CELL/2)*scale};
+    ctx.beginPath();ctx.moveTo(A.x,A.y);ctx.lineTo(B.x,B.y);
+    ctx.lineWidth=hw*2;ctx.strokeStyle=col;ctx.lineCap='round';ctx.stroke();
+    if(rt===HIGHWAY){
+      ctx.lineWidth=hw*2+2*scale;ctx.strokeStyle=COL.roadHwyGlow;ctx.stroke();
+    }
+  }
+
+  if(scale>.4){
+    ctx.save();
+    for(const l of links){
+      const rt=maxClass(l.ax,l.ay,l.bx,l.by);
+      const hw=RHW[rt]*scale;
+      const A={x:l.ax*CELL*scale+view.panX+(CELL/2)*scale,y:l.ay*CELL*scale+view.panY+(CELL/2)*scale};
+      const B={x:l.bx*CELL*scale+view.panX+(CELL/2)*scale,y:l.by*CELL*scale+view.panY+(CELL/2)*scale};
+      const lx=B.x-A.x,ly=B.y-A.y,len=Math.hypot(lx,ly);
+      if(len<1)continue;
+      const nx=-ly/len,ny=lx/len;
+      if(rt===HIGHWAY){
+        ctx.setLineDash([]);ctx.lineWidth=scale*.8;ctx.strokeStyle=COL.laneHwy;
+        for(const s of[-1,1]){
+          ctx.beginPath();ctx.moveTo(A.x+nx*hw*.85*s,A.y+ny*hw*.85*s);
+          ctx.lineTo(B.x+nx*hw*.85*s,B.y+ny*hw*.85*s);ctx.stroke();
+        }
+        ctx.lineWidth=scale*1.5;ctx.strokeStyle=COL.hwyMedian;ctx.setLineDash([]);
+        ctx.beginPath();ctx.moveTo(A.x,A.y);ctx.lineTo(B.x,B.y);ctx.stroke();
+        ctx.setLineDash([6*scale,5*scale]);ctx.lineWidth=scale*.6;ctx.strokeStyle=COL.laneDash;
+        for(const s of[-.48,.48]){
+          ctx.beginPath();ctx.moveTo(A.x+nx*hw*s,A.y+ny*hw*s);
+          ctx.lineTo(B.x+nx*hw*s,B.y+ny*hw*s);ctx.stroke();
+        }
+      } else if(rt===ARTERIAL){
+        ctx.setLineDash([5*scale,5*scale]);ctx.lineWidth=scale*.7;ctx.strokeStyle=COL.laneDash;
+        ctx.beginPath();ctx.moveTo(A.x,A.y);ctx.lineTo(B.x,B.y);ctx.stroke();
+      }
+    }
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  for(let y=y0;y<y1;y++){
+    for(let x=x0;x<x1;x++){
+      if(grid[y][x]!==INTER)continue;
+      const hw=RHW[INTER]*scale;
+      const sx=x*CELL*scale+view.panX+(CELL/2)*scale;
+      const sy=y*CELL*scale+view.panY+(CELL/2)*scale;
+      ctx.fillStyle=COL.inter;
+      ctx.beginPath();ctx.arc(sx,sy,hw,0,Math.PI*2);ctx.fill();
+    }
+  }
+}
+
 function _drawBuildingsTo(ctx2){
   for(const b of buildingCache){
     if(b.type==='park'){
@@ -2317,6 +2404,72 @@ function _drawBuildingsTo(ctx2){
       ctx2.strokeRect(b.px+3,b.py+3,b.cw-6,b.ch-6);
     }
   }
+}
+
+function drawBuildingsLive(range){
+  const{x0,y0,x1,y1}=range;
+  const s=view.zoom;
+  const indices=new Set();
+
+  for(let y=y0;y<y1;y++){
+    for(let x=x0;x<x1;x++){
+      const arr=buildingTileIndex.get(oKey(x,y));
+      if(!arr)continue;
+      for(const i of arr)indices.add(i);
+    }
+  }
+
+  ctx.save();
+  ctx.translate(view.panX,view.panY);
+  ctx.scale(s,s);
+
+  for(const i of indices){
+    const b=buildingCache[i];
+    if(!b)continue;
+
+    if(b.type==='park'){
+      ctx.fillStyle=COL.park;
+      ctx.fillRect(b.px,b.py,CELL,CELL);
+      if(b.feature==='tree'){
+        const t=b.tree;
+        ctx.strokeStyle=COL.parkTrunk;
+        ctx.lineWidth=1.8;
+        ctx.beginPath();ctx.moveTo(b.px+t.tx,b.py+t.ty+3);ctx.lineTo(b.px+t.tx,b.py+t.ty+1);ctx.stroke();
+        ctx.fillStyle=COL.parkTree;
+        ctx.beginPath();ctx.arc(b.px+t.tx,b.py+t.ty,t.r,0,Math.PI*2);ctx.fill();
+      }
+      continue;
+    }
+
+    if(b.type==='house'){
+      const pad=3;
+      ctx.fillStyle=b.dark?COL.lotBg:COL.lotBgAlt;
+      ctx.beginPath();ctx.roundRect(b.px+pad,b.py+pad,CELL-pad*2,CELL-pad*2,2);ctx.fill();
+      ctx.fillStyle=b.roofCol;
+      ctx.beginPath();ctx.roundRect(b.px+b.bx,b.py+b.by,b.bw,b.bh,b.rx);ctx.fill();
+      continue;
+    }
+
+    if(b.type==='tower'){
+      const pad=2;
+      ctx.fillStyle=COL.lotBg;
+      ctx.beginPath();ctx.roundRect(b.px+pad,b.py+pad,b.cw-pad*2,b.ch-pad*2,3);ctx.fill();
+      for(const bl of b.blocks){
+        ctx.fillStyle=bl.glass?COL.towerGlass:COL.roofB;
+        ctx.beginPath();ctx.roundRect(b.px+bl.bx,b.py+bl.by,bl.bw,bl.bh,1);ctx.fill();
+      }
+      continue;
+    }
+
+    if(b.type==='warehouse'){
+      ctx.fillStyle='#141820';
+      ctx.fillRect(b.px+2,b.py+2,b.cw-4,b.ch-4);
+      ctx.strokeStyle='#1e2535';ctx.lineWidth=1;
+      ctx.strokeRect(b.px+3,b.py+3,b.cw-6,b.ch-6);
+    }
+  }
+
+  ctx.restore();
 }
 
 function _drawGroundTo(ctx2){
@@ -2404,15 +2557,21 @@ function drawScene(){
   const wy1=clamp((canvas.height-view.panY)/s,0,WH);
   const ww=Math.max(0,wx1-wx0),wh=Math.max(0,wy1-wy0);
 
+  const useLiveBuildings=s>1.05;
+
   ctx.save();
   ctx.translate(view.panX,view.panY);
   ctx.scale(s,s);
   if(ww>0&&wh>0){
     ctx.drawImage(offGround,wx0,wy0,ww,wh,wx0,wy0,ww,wh);
-    if(s>.2)ctx.drawImage(offBuildings,wx0,wy0,ww,wh,wx0,wy0,ww,wh);
-    ctx.drawImage(offRoads,wx0,wy0,ww,wh,wx0,wy0,ww,wh);
+    if(s>.2&&!useLiveBuildings)ctx.drawImage(offBuildings,wx0,wy0,ww,wh,wx0,wy0,ww,wh);
+    if(s<=1.15)ctx.drawImage(offRoads,wx0,wy0,ww,wh,wx0,wy0,ww,wh);
   }
   ctx.restore();
+
+  if(useLiveBuildings)drawBuildingsLive(range);
+
+  if(s>1.15)drawRoadsLive(range);
 
   drawSignalDots(range);
   drawEditorCursor();
