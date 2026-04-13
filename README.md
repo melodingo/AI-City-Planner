@@ -21,6 +21,14 @@ That gives a practical baseline for future RL or search-based planning policies.
 
 ## Latest Updates (Apr 2026)
 
+### Browser release V6.5
+
+- Added a bottom-left zoning toggle that draws colorful zone-boundary outlines.
+- Added a zone legend panel that appears when zoning overlay is enabled.
+- Improved district realism with more organic zone shape warping.
+- Added more special buildings per zone (landmarks/civic, apartments/villas, plants) for clearer district identity.
+- Updated browser release metadata and map export version to V6.5.
+
 ### Browser release V6.4
 
 - Fixed the intersection lockup issue by removing over-restrictive junction entry gates.

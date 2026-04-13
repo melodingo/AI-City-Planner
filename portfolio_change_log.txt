@@ -6,6 +6,13 @@ city simulation so it can be reused later for portfolio documentation.
 
 Major Versions
 
+11. V6.5 - zoning visibility and district identity expansion (Apr 2026)
+  - Added a bottom-left zoning toggle with colorful zone-boundary outlines for quick planning review.
+  - Added an on-demand zone legend panel that appears with the zoning overlay.
+  - Increased district realism with more organic zone shapes and stronger zone-aware building placement.
+  - Added multiple special buildings per zone (landmarks, civic blocks, apartments, villas, plants) to improve visual and traffic hotspots.
+  - Updated browser release label and export metadata to `V6.5`.
+
 10. V6.4 - traffic flow and density balancing pass (Apr 2026)
   - Fixed core intersection deadlock behavior by relaxing over-strict intersection entry gating.
   - Preserved collision safety while allowing swap resolution and smoother junction throughput.
