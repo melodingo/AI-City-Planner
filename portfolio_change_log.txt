@@ -6,6 +6,13 @@ city simulation so it can be reused later for portfolio documentation.
 
 Major Versions
 
+10. V6.4 - traffic flow and density balancing pass (Apr 2026)
+  - Fixed core intersection deadlock behavior by relaxing over-strict intersection entry gating.
+  - Preserved collision safety while allowing swap resolution and smoother junction throughput.
+  - Reworked spawn behavior into demand-driven multi-spawn ticks for better city-level activity.
+  - Tuned demand multipliers and finalized an active-car cap of 500 for stable performance.
+  - Updated browser release label and export metadata to `V6.4`.
+
 9. V6.3 - rendering and simulation performance merge (Apr 2026)
   - Merged the optimized rendering pipeline with static offscreen caches for ground, buildings, roads, and minimap roads.
   - Replaced linear-scan A* frontier selection with a binary-heap priority queue.

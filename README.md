@@ -21,6 +21,14 @@ That gives a practical baseline for future RL or search-based planning policies.
 
 ## Latest Updates (Apr 2026)
 
+### Browser release V6.4
+
+- Fixed the intersection lockup issue by removing over-restrictive junction entry gates.
+- Kept movement safety while enabling smoother conflict resolution at intersection edges.
+- Added demand-driven multi-spawn tick logic for more realistic active city traffic.
+- Rebalanced density and finalized the active-car cap at 500 for stable runtime behavior.
+- Updated browser release metadata and map export version to V6.4.
+
 ### Browser release V6.3
 
 - Merged optimized rendering with offscreen caching for ground, buildings, roads, and minimap roads.
