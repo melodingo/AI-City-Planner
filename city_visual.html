@@ -315,7 +315,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <div class="sr-row"><span>Deadlock recoveries</span><span id="sr-m-deadlock">0</span></div>
     <div class="sr-row sr-row-hotspots"><span>Hotspots</span><span id="sr-m-hotspots">none</span></div>
   </div>
-  <div id="version-tag">V6.2</div>
+  <div id="version-tag">V6.3</div>
   <div class="panel" id="zoom-tip" style="bottom:13px;left:50%;transform:translateX(-50%)">Scroll · zoom &nbsp;|&nbsp; Drag · pan &nbsp;|&nbsp; New City · regenerate</div>
 </div>
 
@@ -382,6 +382,7 @@ const COL={
 // ─── STATE ────────────────────────────────────────────────────────────────────
 let grid,dirGrid,interMask,zone,cityMask,buildingCache=[];
 let cars=[],completed=[],occupied=new Set(),interLocks=new Map();
+let buildingTileIndex=new Map();
 let tickN=0,stoppedN=0,carId=0;
 // Zone types: 0=none,1=CBD,2=commercial,3=residential,4=industrial,5=park
 const Z={NONE:0,CBD:1,COM:2,RES:3,IND:4,PARK:5};
@@ -464,7 +465,7 @@ function clone2d(arr){
 function exportMapState(){
   return {
     format: 'CityFlowMap',
-    version: 'V6.2',
+    version: 'V6.3',
     width: GW,
     height: GH,
     grid: clone2d(grid),
@@ -494,6 +495,9 @@ function restoreMapState(state){
   simReset();
   tickAccum = 0;
   lastT = performance.now();
+  rebuildBuildingTileIndex();
+  rebuildSignalIntersectionCache();
+  markStaticDirty();
   buildDrvCache();
   resetView();
   document.getElementById('gen-overlay').style.display='none';
@@ -1148,6 +1152,8 @@ function generateBuildings(){
       }
     }
   }
+
+  rebuildBuildingTileIndex();
 }
 
 function addHouse(x,y,z){
@@ -1172,6 +1178,25 @@ function addTower(x,y,w,h){
 function addWarehouse(x,y,w,h){
   const px=x*CELL,py=y*CELL,cw=w*CELL,ch=h*CELL;
   buildingCache.push({type:'warehouse',px,py,cw,ch});
+}
+
+function rebuildBuildingTileIndex(){
+  buildingTileIndex=new Map();
+  for(let i=0;i<buildingCache.length;i++){
+    const b=buildingCache[i];
+    const tx=(b.px/CELL)|0,ty=(b.py/CELL)|0;
+    const tw=Math.max(1,Math.ceil((b.cw||CELL)/CELL));
+    const th=Math.max(1,Math.ceil((b.ch||CELL)/CELL));
+    for(let oy=0;oy<th;oy++){
+      for(let ox=0;ox<tw;ox++){
+        const x=tx+ox,y=ty+oy;
+        if(!inB(x,y))continue;
+        const k=oKey(x,y);
+        if(!buildingTileIndex.has(k))buildingTileIndex.set(k,[]);
+        buildingTileIndex.get(k).push(i);
+      }
+    }
+  }
 }
 
 // ─── PATHFINDING ──────────────────────────────────────────────────────────────
@@ -1231,21 +1256,60 @@ function moveCost(x,y,opts={}){
   return base + congestion*congestionWeight;
 }
 
+class MinHeap{
+  constructor(){this.a=[];}
+  get size(){return this.a.length;}
+  push(v){
+    const a=this.a;
+    a.push(v);
+    let i=a.length-1;
+    while(i>0){
+      const p=(i-1)>>1;
+      if(a[p].f<=a[i].f)break;
+      [a[p],a[i]]=[a[i],a[p]];
+      i=p;
+    }
+  }
+  pop(){
+    const a=this.a;
+    if(!a.length)return null;
+    const top=a[0];
+    const last=a.pop();
+    if(a.length){
+      a[0]=last;
+      let i=0;
+      for(;;){
+        const l=i*2+1,r=l+1;
+        let m=i;
+        if(l<a.length&&a[l].f<a[m].f)m=l;
+        if(r<a.length&&a[r].f<a[m].f)m=r;
+        if(m===i)break;
+        [a[i],a[m]]=[a[m],a[i]];
+        i=m;
+      }
+    }
+    return top;
+  }
+}
+
 function astar(sx,sy,gx,gy,opts={}){
   if(sx===gx&&sy===gy)return[{x:sx,y:sy,dx:0,dy:0}];
   const K=(x,y)=>y*GW+x;
-  const open=[{x:sx,y:sy,g:0,f:Math.abs(sx-gx)+Math.abs(sy-gy),dx:0,dy:0}];
-  const gs={[K(sx,sy)]:0},fr={};
+  const open=new MinHeap();
+  const startK=K(sx,sy);
+  const gs={[startK]:0},fr={};
+  open.push({x:sx,y:sy,g:0,f:Math.abs(sx-gx)+Math.abs(sy-gy),dx:0,dy:0});
   const randomness=opts.randomness??0;
-  while(open.length){
-    let bi=0;for(let i=1;i<open.length;i++)if(open[i].f<open[bi].f)bi=i;
-    const cur=open.splice(bi,1)[0];
+  while(open.size){
+    const cur=open.pop();
+    const ck=K(cur.x,cur.y);
+    if(cur.g>(gs[ck]??1e9))continue;
     if(cur.x===gx&&cur.y===gy){
       const p=[];let c=cur;while(c){p.unshift(c);c=fr[K(c.x,c.y)]||null;}return p;
     }
     for(const nb of nbrs(cur.x,cur.y,opts)){
       const noise=randomness>0?Math.random()*randomness:0;
-      const ng=(gs[K(cur.x,cur.y)]||0)+moveCost(nb.x,nb.y,opts)+noise;
+      const ng=(gs[ck]||0)+moveCost(nb.x,nb.y,opts)+noise;
       const nk=K(nb.x,nb.y);
       if(ng<(gs[nk]??1e9)){
         gs[nk]=ng;fr[nk]=cur;
@@ -1379,6 +1443,7 @@ let throughputWindow=[];
 let trafficMetrics={};
 let hoveredHotspot=null;
 let hotspotUiSig='';
+let driveOrderCursor=0;
 
 function resetStopStats(){
   stopStats.noRoute=0;
@@ -1661,6 +1726,9 @@ function simReset(){
   drvTilesCache=null;
   metricsFrozen=false;
   fullStopStreak=0;
+  signalApproach.clear();
+  signalTimer.clear();
+  driveOrderCursor=0;
   signalDemand.clear();
   resetStopStats();
   resetTrafficMetrics();
@@ -1730,6 +1798,7 @@ function spawnCar(){
 const signalApproach=new Map();
 const signalTimer=new Map();
 const signalDemand=new Map();
+let signalIntersectionCache=[];
 
 function approachFromMove(dx,dy){
   if(dx>0)return'W';
@@ -1772,40 +1841,48 @@ function noteSignalDemand(k,dx,dy){
   signalDemand.set(k,d);
 }
 
-function updateSignals(){
-  // Only large intersections (HIGHWAY or ARTERIAL) have signals
+function rebuildSignalIntersectionCache(){
+  signalIntersectionCache=[];
+  signalApproach.clear();
+  signalTimer.clear();
+  signalDemand.clear();
   for(let y=0;y<GH;y++){
     for(let x=0;x<GW;x++){
       if(grid[y][x]!==INTER)continue;
       const m=interMask[y][x]||0;
       if(!(m&BIT[HIGHWAY])&&!(m&BIT[ARTERIAL]))continue;
-      const k=oKey(x,y);
-      const available=intersectionApproaches(x,y);
-      if(!available.length)continue;
-      let active=signalApproach.get(k);
-      if(!active||!available.includes(active))active=available[0];
-      let timer=(signalTimer.get(k)||0)+1;
-      const d=signalDemand.get(k)||{N:0,E:0,S:0,W:0};
-      const greenDemand=d[active]||0;
-      let bestApproach=active,bestDemand=greenDemand;
-      for(const a of available){
-        const v=d[a]||0;
-        if(v>bestDemand){bestDemand=v;bestApproach=a;}
-      }
-      let flip=false;
-      if(timer>=SIGNAL_MAX_GREEN)flip=true;
-      else if(timer>=SIGNAL_MIN_GREEN){
-        if(bestApproach!==active&&bestDemand>greenDemand+1)flip=true;
-        else if(greenDemand===0&&bestDemand>0)flip=true;
-      }
-      if(flip){
-        timer=0;
-        if(bestApproach!==active)active=bestApproach;
-        else active=approachOrderAfter(active,available);
-      }
-      signalApproach.set(k,active);
-      signalTimer.set(k,timer);
+      signalIntersectionCache.push({x,y,k:oKey(x,y),available:intersectionApproaches(x,y)});
     }
+  }
+}
+
+function updateSignals(){
+  for(const si of signalIntersectionCache){
+    const{k,available}=si;
+    if(!available.length)continue;
+    let active=signalApproach.get(k);
+    if(!active||!available.includes(active))active=available[0];
+    let timer=(signalTimer.get(k)||0)+1;
+    const d=signalDemand.get(k)||{N:0,E:0,S:0,W:0};
+    const greenDemand=d[active]||0;
+    let bestApproach=active,bestDemand=greenDemand;
+    for(const a of available){
+      const v=d[a]||0;
+      if(v>bestDemand){bestDemand=v;bestApproach=a;}
+    }
+    let flip=false;
+    if(timer>=SIGNAL_MAX_GREEN)flip=true;
+    else if(timer>=SIGNAL_MIN_GREEN){
+      if(bestApproach!==active&&bestDemand>greenDemand+1)flip=true;
+      else if(greenDemand===0&&bestDemand>0)flip=true;
+    }
+    if(flip){
+      timer=0;
+      if(bestApproach!==active)active=bestApproach;
+      else active=approachOrderAfter(active,available);
+    }
+    signalApproach.set(k,active);
+    signalTimer.set(k,timer);
   }
 }
 
@@ -1848,16 +1925,24 @@ function simStep(){
   const movedThisTick=new Set();
   const reservedIntersectionExits=new Set();
   let arrivalsThisTick=0;
-  // Priority: cars stopped longer are evaluated first to reduce stalemates.
-  const driveOrder=[...cars].sort((a,b)=>{
-    const aInInter=grid[a.y][a.x]===INTER?1:0;
-    const bInInter=grid[b.y][b.x]===INTER?1:0;
-    if(aInInter!==bInInter)return bInInter-aInInter;
-    const pa=b.stuckTicks*3+b.currentInterWait;
-    const pb=a.stuckTicks*3+a.currentInterWait;
-    if(pa!==pb)return pa-pb;
-    return Math.random()-.5;
-  });
+  // Linear-time priority queue: clear intersections first, then stuck cars.
+  const interFirst=[];
+  const stuckBuckets=Array.from({length:8},()=>[]);
+  const regular=[];
+  for(const c of cars){
+    if(grid[c.y][c.x]===INTER){interFirst.push(c);continue;}
+    if(c.stuckTicks>0){
+      const bi=Math.min(stuckBuckets.length-1,(c.stuckTicks/2)|0);
+      stuckBuckets[bi].push(c);
+    }else regular.push(c);
+  }
+  const driveOrder=[];
+  driveOrder.push(...interFirst);
+  for(let i=stuckBuckets.length-1;i>=0;i--)driveOrder.push(...stuckBuckets[i]);
+  if(regular.length){
+    driveOrderCursor=(driveOrderCursor+1)%regular.length;
+    for(let i=0;i<regular.length;i++)driveOrder.push(regular[(driveOrderCursor+i)%regular.length]);
+  }
 
   for(const c of driveOrder){
     if(movedThisTick.has(c.id))continue;
@@ -2039,6 +2124,29 @@ const ctx=canvas.getContext('2d');
 const mmCanvas=document.getElementById('minimap-canvas');
 const mmCtx=mmCanvas.getContext('2d');
 
+let offGround=null,offBuildings=null,offRoads=null,offMinimap=null;
+let staticDirty=true,minimapDirty=true;
+
+function mkOff(w,h){const c=document.createElement('canvas');c.width=w;c.height=h;return c;}
+function markStaticDirty(){staticDirty=true;minimapDirty=true;}
+
+function rebuildStaticCache(){
+  offGround=mkOff(WW,WH);
+  offBuildings=mkOff(WW,WH);
+  offRoads=mkOff(WW,WH);
+  _drawGroundTo(offGround.getContext('2d'));
+  _drawBuildingsTo(offBuildings.getContext('2d'));
+  _drawRoadsTo(offRoads.getContext('2d'));
+  staticDirty=false;
+  minimapDirty=true;
+}
+
+function rebuildMinimapCache(){
+  offMinimap=mkOff(mmCanvas.width,mmCanvas.height);
+  _drawMinimapRoadsTo(offMinimap.getContext('2d'));
+  minimapDirty=false;
+}
+
 const view={zoom:1,panX:0,panY:0,drag:false,dragX:0,dragY:0,minZ:.05,maxZ:3};
 
 function toScreen(wx,wy){return{x:wx*view.zoom+view.panX,y:wy*view.zoom+view.panY};}
@@ -2055,12 +2163,11 @@ function visibleTileRange(){
 }
 
 // Road link drawing — uses canvas paths for smooth, thick strokes
-function drawRoads(range){
-  // Build link list in rank order (draw low roads first so high roads on top)
+function _drawRoadsTo(ctx2){
+  // Build link list in rank order (draw low roads first so high roads on top).
   const links=[];
-  const{x0,y0,x1,y1}=range;
-  for(let y=y0;y<y1;y++){
-    for(let x=x0;x<x1;x++){
+  for(let y=0;y<GH;y++){
+    for(let x=0;x<GW;x++){
       if(!isDrv(x,y))continue;
       if(isDrv(x+1,y))links.push({ax:x,ay:y,bx:x+1,by:y});
       if(isDrv(x,y+1))links.push({ax:x,ay:y,bx:x,by:y+1});
@@ -2075,182 +2182,156 @@ function drawRoads(range){
   // Sort: LOCAL first, then ARTERIAL, then HIGHWAY (paint on top)
   links.sort((a,b)=>maxClass(a.ax,a.ay,a.bx,a.by)-maxClass(b.ax,b.ay,b.bx,b.by));
 
-  const scale=view.zoom;
+  const scale=1;
 
   // Shadow pass
   for(const l of links){
     const rt=maxClass(l.ax,l.ay,l.bx,l.by);
     const hw=RHW[rt]*scale;
-    const A={x:l.ax*CELL*scale+view.panX+(CELL/2)*scale,y:l.ay*CELL*scale+view.panY+(CELL/2)*scale};
-    const B={x:l.bx*CELL*scale+view.panX+(CELL/2)*scale,y:l.by*CELL*scale+view.panY+(CELL/2)*scale};
-    ctx.beginPath();ctx.moveTo(A.x,A.y);ctx.lineTo(B.x,B.y);
-    ctx.lineWidth=hw*2+4*scale;ctx.strokeStyle='rgba(0,0,0,.35)';
-    ctx.lineCap='round';ctx.stroke();
+    const A={x:l.ax*CELL*scale+(CELL/2)*scale,y:l.ay*CELL*scale+(CELL/2)*scale};
+    const B={x:l.bx*CELL*scale+(CELL/2)*scale,y:l.by*CELL*scale+(CELL/2)*scale};
+    ctx2.beginPath();ctx2.moveTo(A.x,A.y);ctx2.lineTo(B.x,B.y);
+    ctx2.lineWidth=hw*2+4*scale;ctx2.strokeStyle='rgba(0,0,0,.35)';
+    ctx2.lineCap='round';ctx2.stroke();
   }
   // Road surface pass
   for(const l of links){
     const rt=maxClass(l.ax,l.ay,l.bx,l.by);
     const hw=RHW[rt]*scale;
     const col=rt===HIGHWAY?COL.roadHighway:rt===ARTERIAL?COL.roadArterial:COL.roadLocal;
-    const A={x:l.ax*CELL*scale+view.panX+(CELL/2)*scale,y:l.ay*CELL*scale+view.panY+(CELL/2)*scale};
-    const B={x:l.bx*CELL*scale+view.panX+(CELL/2)*scale,y:l.by*CELL*scale+view.panY+(CELL/2)*scale};
-    ctx.beginPath();ctx.moveTo(A.x,A.y);ctx.lineTo(B.x,B.y);
-    ctx.lineWidth=hw*2;ctx.strokeStyle=col;ctx.lineCap='round';ctx.stroke();
+    const A={x:l.ax*CELL*scale+(CELL/2)*scale,y:l.ay*CELL*scale+(CELL/2)*scale};
+    const B={x:l.bx*CELL*scale+(CELL/2)*scale,y:l.by*CELL*scale+(CELL/2)*scale};
+    ctx2.beginPath();ctx2.moveTo(A.x,A.y);ctx2.lineTo(B.x,B.y);
+    ctx2.lineWidth=hw*2;ctx2.strokeStyle=col;ctx2.lineCap='round';ctx2.stroke();
     // Highway glow edge
     if(rt===HIGHWAY){
-      ctx.lineWidth=hw*2+2*scale;ctx.strokeStyle=COL.roadHwyGlow;ctx.stroke();
+      ctx2.lineWidth=hw*2+2*scale;ctx2.strokeStyle=COL.roadHwyGlow;ctx2.stroke();
     }
   }
-  // Lane markings (only at zoom > 0.4)
-  if(scale>.4){
-    ctx.save();
-    for(const l of links){
-      const rt=maxClass(l.ax,l.ay,l.bx,l.by);
-      const hw=RHW[rt]*scale;
-      const A={x:l.ax*CELL*scale+view.panX+(CELL/2)*scale,y:l.ay*CELL*scale+view.panY+(CELL/2)*scale};
-      const B={x:l.bx*CELL*scale+view.panX+(CELL/2)*scale,y:l.by*CELL*scale+view.panY+(CELL/2)*scale};
-      const lx=B.x-A.x,ly=B.y-A.y,len=Math.hypot(lx,ly);
-      if(len<1)continue;
-      const nx=-ly/len,ny=lx/len;
-      if(rt===HIGHWAY){
-        // Solid edge lines
-        ctx.setLineDash([]);ctx.lineWidth=scale*.8;ctx.strokeStyle=COL.laneHwy;
-        for(const s of[-1,1]){
-          ctx.beginPath();ctx.moveTo(A.x+nx*hw*.85*s,A.y+ny*hw*.85*s);
-          ctx.lineTo(B.x+nx*hw*.85*s,B.y+ny*hw*.85*s);ctx.stroke();
-        }
-        // Centre median
-        ctx.lineWidth=scale*1.5;ctx.strokeStyle=COL.hwyMedian;ctx.setLineDash([]);
-        ctx.beginPath();ctx.moveTo(A.x,A.y);ctx.lineTo(B.x,B.y);ctx.stroke();
-        // Lane splits (dashed)
-        ctx.setLineDash([6*scale,5*scale]);ctx.lineWidth=scale*.6;ctx.strokeStyle=COL.laneDash;
-        for(const s of[-.48,.48]){
-          ctx.beginPath();ctx.moveTo(A.x+nx*hw*s,A.y+ny*hw*s);
-          ctx.lineTo(B.x+nx*hw*s,B.y+ny*hw*s);ctx.stroke();
-        }
-      } else if(rt===ARTERIAL){
-        ctx.setLineDash([5*scale,5*scale]);ctx.lineWidth=scale*.7;ctx.strokeStyle=COL.laneDash;
-        ctx.beginPath();ctx.moveTo(A.x,A.y);ctx.lineTo(B.x,B.y);ctx.stroke();
+  // Lane markings
+  ctx2.save();
+  for(const l of links){
+    const rt=maxClass(l.ax,l.ay,l.bx,l.by);
+    if(rt===LOCAL)continue;
+    const hw=RHW[rt]*scale;
+    const A={x:l.ax*CELL*scale+(CELL/2)*scale,y:l.ay*CELL*scale+(CELL/2)*scale};
+    const B={x:l.bx*CELL*scale+(CELL/2)*scale,y:l.by*CELL*scale+(CELL/2)*scale};
+    const lx=B.x-A.x,ly=B.y-A.y,len=Math.hypot(lx,ly);
+    if(len<1)continue;
+    const nx=-ly/len,ny=lx/len;
+    if(rt===HIGHWAY){
+      ctx2.setLineDash([]);ctx2.lineWidth=scale*.8;ctx2.strokeStyle=COL.laneHwy;
+      for(const s of[-1,1]){
+        ctx2.beginPath();ctx2.moveTo(A.x+nx*hw*.85*s,A.y+ny*hw*.85*s);
+        ctx2.lineTo(B.x+nx*hw*.85*s,B.y+ny*hw*.85*s);ctx2.stroke();
       }
+      ctx2.lineWidth=scale*1.5;ctx2.strokeStyle=COL.hwyMedian;ctx2.setLineDash([]);
+      ctx2.beginPath();ctx2.moveTo(A.x,A.y);ctx2.lineTo(B.x,B.y);ctx2.stroke();
+      ctx2.setLineDash([6*scale,5*scale]);ctx2.lineWidth=scale*.6;ctx2.strokeStyle=COL.laneDash;
+      for(const s of[-.48,.48]){
+        ctx2.beginPath();ctx2.moveTo(A.x+nx*hw*s,A.y+ny*hw*s);
+        ctx2.lineTo(B.x+nx*hw*s,B.y+ny*hw*s);ctx2.stroke();
+      }
+    } else if(rt===ARTERIAL){
+      ctx2.setLineDash([5*scale,5*scale]);ctx2.lineWidth=scale*.7;ctx2.strokeStyle=COL.laneDash;
+      ctx2.beginPath();ctx2.moveTo(A.x,A.y);ctx2.lineTo(B.x,B.y);ctx2.stroke();
     }
-    ctx.setLineDash([]);
-    ctx.restore();
   }
+  ctx2.setLineDash([]);
+  ctx2.restore();
 
   // Intersection pads
-  for(let y=y0;y<y1;y++){
-    for(let x=x0;x<x1;x++){
+  for(let y=0;y<GH;y++){
+    for(let x=0;x<GW;x++){
       if(grid[y][x]!==INTER)continue;
-      const mask=interMask[y][x]||0;
-      const cls=mask&BIT[HIGHWAY]?HIGHWAY:mask&BIT[ARTERIAL]?ARTERIAL:LOCAL;
       const hw=RHW[INTER]*scale;
-      const sx=x*CELL*scale+view.panX+(CELL/2)*scale;
-      const sy=y*CELL*scale+view.panY+(CELL/2)*scale;
-      ctx.fillStyle=COL.inter;
-      ctx.beginPath();ctx.arc(sx,sy,hw,0,Math.PI*2);ctx.fill();
-      // Traffic signal indicators per incoming approach.
-      if(scale>.6&&(cls===HIGHWAY||cls===ARTERIAL)){
-        const k=oKey(x,y);
-        const active=signalApproach.get(k);
-        const aps=intersectionApproaches(x,y);
-        const off=3.6*scale;
-        const dots={
-          N:{x:sx,y:sy-off},
-          E:{x:sx+off,y:sy},
-          S:{x:sx,y:sy+off},
-          W:{x:sx-off,y:sy},
-        };
-        for(const a of aps){
-          const p=dots[a];
-          if(!p)continue;
-          ctx.fillStyle=active===a?COL.signal_green:COL.signal_red;
-          ctx.beginPath();ctx.arc(p.x,p.y,1.9*scale,0,Math.PI*2);ctx.fill();
-        }
-      }
+      const sx=x*CELL*scale+(CELL/2)*scale;
+      const sy=y*CELL*scale+(CELL/2)*scale;
+      ctx2.fillStyle=COL.inter;
+      ctx2.beginPath();ctx2.arc(sx,sy,hw,0,Math.PI*2);ctx2.fill();
     }
   }
 }
 
-function drawBuildings(range){
+function drawSignalDots(range){
+  if(view.zoom<=.6)return;
   const{x0,y0,x1,y1}=range;
-  const s=view.zoom;
-  const px0=x0*CELL,py0=y0*CELL;
+  const off=3.6*view.zoom;
+  const dots={N:{x:0,y:-1},E:{x:1,y:0},S:{x:0,y:1},W:{x:-1,y:0}};
+  for(const si of signalIntersectionCache){
+    const{x,y,k,available}=si;
+    if(x<x0||x>=x1||y<y0||y>=y1)continue;
+    const active=signalApproach.get(k);
+    if(!active)continue;
+    const sx=x*CELL*view.zoom+view.panX+(CELL/2)*view.zoom;
+    const sy=y*CELL*view.zoom+view.panY+(CELL/2)*view.zoom;
+    for(const a of available){
+      const p=dots[a];
+      if(!p)continue;
+      ctx.fillStyle=active===a?COL.signal_green:COL.signal_red;
+      ctx.beginPath();ctx.arc(sx+p.x*off,sy+p.y*off,1.9*view.zoom,0,Math.PI*2);ctx.fill();
+    }
+  }
+}
 
-  ctx.save();
-  ctx.translate(view.panX,view.panY);ctx.scale(s,s);
-
+function _drawBuildingsTo(ctx2){
   for(const b of buildingCache){
-    const bx=b.px/CELL|0,by=b.py/CELL|0;
-    if(bx<x0||bx>=x1||by<y0||by>=y1)continue;
-
     if(b.type==='park'){
-      // Plain green base, only tree accents.
-      ctx.fillStyle=COL.park;
-      ctx.fillRect(b.px,b.py,CELL,CELL);
+      ctx2.fillStyle=COL.park;
+      ctx2.fillRect(b.px,b.py,CELL,CELL);
 
       if(b.feature==='tree'){
         const t=b.tree;
-        ctx.strokeStyle=COL.parkTrunk;
-        ctx.lineWidth=1.8;
-        ctx.beginPath();ctx.moveTo(b.px+t.tx,b.py+t.ty+3);ctx.lineTo(b.px+t.tx,b.py+t.ty+1);ctx.stroke();
-        ctx.fillStyle=COL.parkTree;
-        ctx.beginPath();ctx.arc(b.px+t.tx,b.py+t.ty,t.r,0,Math.PI*2);ctx.fill();
-        ctx.fillStyle='rgba(150,210,140,.12)';
-        ctx.beginPath();ctx.arc(b.px+t.tx-1,b.py+t.ty-1,t.r*.35,0,Math.PI*2);ctx.fill();
+        ctx2.strokeStyle=COL.parkTrunk;
+        ctx2.lineWidth=1.8;
+        ctx2.beginPath();ctx2.moveTo(b.px+t.tx,b.py+t.ty+3);ctx2.lineTo(b.px+t.tx,b.py+t.ty+1);ctx2.stroke();
+        ctx2.fillStyle=COL.parkTree;
+        ctx2.beginPath();ctx2.arc(b.px+t.tx,b.py+t.ty,t.r,0,Math.PI*2);ctx2.fill();
+        ctx2.fillStyle='rgba(150,210,140,.12)';
+        ctx2.beginPath();ctx2.arc(b.px+t.tx-1,b.py+t.ty-1,t.r*.35,0,Math.PI*2);ctx2.fill();
       }
       continue;
     }
     if(b.type==='house'){
       const pad=3;
-      ctx.fillStyle=b.dark?COL.lotBg:COL.lotBgAlt;
-      ctx.beginPath();ctx.roundRect(b.px+pad,b.py+pad,CELL-pad*2,CELL-pad*2,2);ctx.fill();
-      if(s>.35){
-        ctx.fillStyle=b.roofCol;
-        ctx.beginPath();ctx.roundRect(b.px+b.bx,b.py+b.by,b.bw,b.bh,b.rx);ctx.fill();
-      }
+      ctx2.fillStyle=b.dark?COL.lotBg:COL.lotBgAlt;
+      ctx2.beginPath();ctx2.roundRect(b.px+pad,b.py+pad,CELL-pad*2,CELL-pad*2,2);ctx2.fill();
+      ctx2.fillStyle=b.roofCol;
+      ctx2.beginPath();ctx2.roundRect(b.px+b.bx,b.py+b.by,b.bw,b.bh,b.rx);ctx2.fill();
       continue;
     }
     if(b.type==='tower'){
       const pad=2;
-      ctx.fillStyle=COL.lotBg;
-      ctx.beginPath();ctx.roundRect(b.px+pad,b.py+pad,b.cw-pad*2,b.ch-pad*2,3);ctx.fill();
-      if(s>.25){
-        for(const bl of b.blocks){
-          ctx.fillStyle=bl.glass?COL.towerGlass:COL.roofB;
-          ctx.beginPath();ctx.roundRect(b.px+bl.bx,b.py+bl.by,bl.bw,bl.bh,1);ctx.fill();
-        }
+      ctx2.fillStyle=COL.lotBg;
+      ctx2.beginPath();ctx2.roundRect(b.px+pad,b.py+pad,b.cw-pad*2,b.ch-pad*2,3);ctx2.fill();
+      for(const bl of b.blocks){
+        ctx2.fillStyle=bl.glass?COL.towerGlass:COL.roofB;
+        ctx2.beginPath();ctx2.roundRect(b.px+bl.bx,b.py+bl.by,bl.bw,bl.bh,1);ctx2.fill();
       }
       continue;
     }
     if(b.type==='warehouse'){
-      ctx.fillStyle='#141820';
-      ctx.fillRect(b.px+2,b.py+2,b.cw-4,b.ch-4);
-      if(s>.3){
-        ctx.strokeStyle='#1e2535';ctx.lineWidth=1;
-        ctx.strokeRect(b.px+3,b.py+3,b.cw-6,b.ch-6);
-      }
+      ctx2.fillStyle='#141820';
+      ctx2.fillRect(b.px+2,b.py+2,b.cw-4,b.ch-4);
+      ctx2.strokeStyle='#1e2535';ctx2.lineWidth=1;
+      ctx2.strokeRect(b.px+3,b.py+3,b.cw-6,b.ch-6);
     }
   }
-  ctx.restore();
 }
 
-function drawGround(range){
-  const{x0,y0,x1,y1}=range;
-  const s=view.zoom;
-  ctx.save();ctx.translate(view.panX,view.panY);ctx.scale(s,s);
-  for(let y=y0;y<y1;y++){
-    for(let x=x0;x<x1;x++){
+function _drawGroundTo(ctx2){
+  for(let y=0;y<GH;y++){
+    for(let x=0;x<GW;x++){
       if(!cityMask[y]||!cityMask[y][x]){
-        ctx.fillStyle=COL.fringe;ctx.fillRect(x*CELL,y*CELL,CELL,CELL);
+        ctx2.fillStyle=COL.fringe;ctx2.fillRect(x*CELL,y*CELL,CELL,CELL);
         continue;
       }
       if(grid[y][x]!==EMPTY)continue;
       const z=zone[y][x];
-      ctx.fillStyle=z===Z.CBD?COL.zoneComm:z===Z.COM?COL.zoneComm:z===Z.IND?COL.zoneInd:z===Z.PARK?COL.park:COL.cityGround;
-      ctx.fillRect(x*CELL,y*CELL,CELL,CELL);
+      ctx2.fillStyle=z===Z.CBD?COL.zoneComm:z===Z.COM?COL.zoneComm:z===Z.IND?COL.zoneInd:z===Z.PARK?COL.park:COL.cityGround;
+      ctx2.fillRect(x*CELL,y*CELL,CELL,CELL);
     }
   }
-  ctx.restore();
 }
 
 function drawCar(c){
@@ -2280,18 +2361,10 @@ function drawCar(c){
 }
 
 function drawMinimap(){
+  if(minimapDirty||!offMinimap)rebuildMinimapCache();
   const mw=mmCanvas.width,mh=mmCanvas.height;
-  mmCtx.fillStyle='#0a0c12';mmCtx.fillRect(0,0,mw,mh);
+  mmCtx.drawImage(offMinimap,0,0);
   const sx=mw/(GW*CELL),sy=mh/(GH*CELL);
-  // Road pixels
-  for(let y=0;y<GH;y++){
-    for(let x=0;x<GW;x++){
-      if(!grid[y][x])continue;
-      const t=roadClassAt(x,y)||LOCAL;
-      mmCtx.fillStyle=t===HIGHWAY?'#1a4060':t===ARTERIAL?'#1e3555':'#181e2e';
-      mmCtx.fillRect(x*CELL*sx,y*CELL*sy,Math.ceil(CELL*sx)+1,Math.ceil(CELL*sy)+1);
-    }
-  }
   // Cars
   for(const c of cars){
     mmCtx.fillStyle=c.stopped?'#e05555':'#f0b429';
@@ -2304,13 +2377,44 @@ function drawMinimap(){
   mmCtx.strokeRect(vx*sx,vy*sy,vw*sx,vh*sy);
 }
 
+function _drawMinimapRoadsTo(ctx2){
+  const mw=mmCanvas.width,mh=mmCanvas.height;
+  ctx2.fillStyle='#0a0c12';ctx2.fillRect(0,0,mw,mh);
+  const sx=mw/(GW*CELL),sy=mh/(GH*CELL);
+  for(let y=0;y<GH;y++){
+    for(let x=0;x<GW;x++){
+      if(!grid[y][x])continue;
+      const t=roadClassAt(x,y)||LOCAL;
+      ctx2.fillStyle=t===HIGHWAY?'#1a4060':t===ARTERIAL?'#1e3555':'#181e2e';
+      ctx2.fillRect(x*CELL*sx,y*CELL*sy,Math.ceil(CELL*sx)+1,Math.ceil(CELL*sy)+1);
+    }
+  }
+}
+
 function drawScene(){
   ctx.fillStyle=COL.bg;ctx.fillRect(0,0,canvas.width,canvas.height);
   if(!grid||!grid.length)return;
+  if(staticDirty||!offGround||!offBuildings||!offRoads)rebuildStaticCache();
+
   const range=visibleTileRange();
-  drawGround(range);
-  drawBuildings(range);
-  drawRoads(range);
+  const s=view.zoom;
+  const wx0=clamp((-view.panX)/s,0,WW);
+  const wy0=clamp((-view.panY)/s,0,WH);
+  const wx1=clamp((canvas.width-view.panX)/s,0,WW);
+  const wy1=clamp((canvas.height-view.panY)/s,0,WH);
+  const ww=Math.max(0,wx1-wx0),wh=Math.max(0,wy1-wy0);
+
+  ctx.save();
+  ctx.translate(view.panX,view.panY);
+  ctx.scale(s,s);
+  if(ww>0&&wh>0){
+    ctx.drawImage(offGround,wx0,wy0,ww,wh,wx0,wy0,ww,wh);
+    if(s>.2)ctx.drawImage(offBuildings,wx0,wy0,ww,wh,wx0,wy0,ww,wh);
+    ctx.drawImage(offRoads,wx0,wy0,ww,wh,wx0,wy0,ww,wh);
+  }
+  ctx.restore();
+
+  drawSignalDots(range);
   drawEditorCursor();
   for(const c of cars)drawCar(c);
   drawHoveredHotspotMarker();
@@ -2368,6 +2472,7 @@ function todPhase(h){
 }
 
 function updateHud(){
+  if(++updateHud.frame%6!==0)return;
   const all=[...cars,...completed.slice(-300)];
   const avg=all.length?(all.reduce((s,c)=>s+c.travel,0)/all.length).toFixed(1):'0.0';
   document.getElementById('s-tick').textContent=tickN;
@@ -2382,6 +2487,7 @@ function updateHud(){
   document.getElementById('tod-phase').textContent=todPhase(h);
   updateStopPanel();
 }
+updateHud.frame=0;
 
 function updateStopPanel(){
   const metrics=trafficMetrics;
@@ -2589,8 +2695,10 @@ function finalizeEditStroke(){
   editor.lastCell=null;
   normaliseIntersections();
   simReset();
+  rebuildSignalIntersectionCache();
   buildDrvCache();
   generateBuildings();
+  markStaticDirty();
   for(let i=0;i<20;i++)spawnCar();
 }
 
@@ -2790,6 +2898,8 @@ async function startCity(){
   simReset();buildingCache=[];
   resizeCanvas();
   await buildCity((pct,phase,meta)=>{setGenProgress(pct,phase,meta||'');});
+  rebuildSignalIntersectionCache();
+  markStaticDirty();
   buildDrvCache();
   // Warm-up spawn
   for(let i=0;i<30;i++)spawnCar();

@@ -6,6 +6,13 @@ city simulation so it can be reused later for portfolio documentation.
 
 Major Versions
 
+9. V6.3 - rendering and simulation performance merge (Apr 2026)
+  - Merged the optimized rendering pipeline with static offscreen caches for ground, buildings, roads, and minimap roads.
+  - Replaced linear-scan A* frontier selection with a binary-heap priority queue.
+  - Removed per-tick full car sorting in simulation and switched to a linear-time prioritized drive-order pass.
+  - Added a precomputed signal-intersection cache so traffic-light updates no longer scan the full map each tick.
+  - Throttled HUD updates and refreshed release metadata/UI labels to `V6.3`.
+
 8. V6.2 - highway spacing stability pass (Apr 2026)
   - Updated highway generation to enforce dominant-axis corridor separation more reliably.
   - Fixed cases where shifted corridor segments could produce two near-parallel highways side-by-side.
