@@ -399,6 +399,10 @@ const HOURLY_DEMAND=[
   .60,.58,.60,.62,.65,.75, // 12-17 daytime→pm
   .95,.85,.55,.38,.25,.15  // 18-23 evening rush→night
 ];
+const RUSH_HOUR_MULT=1.5;
+const OFFPEAK_MULT=.55;
+const DAY_MULT=.95;
+const SPAWN_PRESSURE=.92;
 
 // ─── ARRAYS ───────────────────────────────────────────────────────────────────
 function mk2d(h,w,v){return Array.from({length:h},()=>new Array(w).fill(v));}
@@ -1738,7 +1742,13 @@ function currentHour(){return(simTime*24|0)%24;}
 
 function spawnDemand(){
   const h=currentHour();
-  return HOURLY_DEMAND[h];
+  let d=HOURLY_DEMAND[h]||.1;
+  const rush=(h>=7&&h<=10)||(h>=16&&h<=19);
+  const offpeak=h<=5||h>=22;
+  if(rush)d*=RUSH_HOUR_MULT;
+  else if(offpeak)d*=OFFPEAK_MULT;
+  else d*=DAY_MULT;
+  return clamp(d,.03,1);
 }
 
 // Pick origin zone biased by time of day (morning: from RES; evening: from COM/CBD)
@@ -1773,7 +1783,7 @@ function spawnCar(){
   if(!drvTilesCache)buildDrvCache();
   if(cars.length>=MAX_CARS)return;
   const demand=spawnDemand();
-  if(Math.random()>demand*.7)return;
+  if(Math.random()>demand*SPAWN_PRESSURE)return;
 
   const origZone=pickOriginZone();
   const destZone=pickDestZone(origZone);
@@ -1920,7 +1930,6 @@ function simStep(){
     };
     if(approachQueueTotal(clean))interQueues.set(k,clean);else interQueues.delete(k);
   }
-  const interPassApproach=new Map();
   const interPassCount=new Map();
   const movedThisTick=new Set();
   const reservedIntersectionExits=new Set();
@@ -2049,32 +2058,19 @@ function simStep(){
         recordStop('redSignal');
         continue;
       }
+
       const approach=approachFromMove(nxt.dx,nxt.dy);
       const qs=interQueues.get(nk)||newApproachQueues();
       const q=qs[approach];
       if(!q.includes(c.id))q.push(c.id);
 
-      // Prune stale head entries for this approach queue.
-      while(q.length){
-        const headCar=carById.get(q[0]);
-        if(!headCar){q.shift();continue;}
-        const headNxt=headCar.nextStep();
-        if(!headNxt||headNxt.x!==nxt.x||headNxt.y!==nxt.y){q.shift();continue;}
-        if(approachFromMove(headNxt.dx,headNxt.dy)!==approach){q.shift();continue;}
-        break;
-      }
-
       interQueues.set(nk,qs);
-      if(q[0]!==c.id){c.tickStop(true,false);recordStop('intersectionLock');continue;}
-
-      const usedApproach=interPassApproach.get(nk);
       const passCount=interPassCount.get(nk)||0;
-      const approachCompatible=(passCount===0)||(usedApproach===approach&&passCount<SIGNAL_PASS_PER_TICK);
-      if(!approachCompatible){c.tickStop(true,false);recordStop('intersectionLock');continue;}
+      if(passCount>=SIGNAL_PASS_PER_TICK){c.tickStop(true,false);recordStop('intersectionLock');continue;}
 
-      q.shift();
+      const idx=q.indexOf(c.id);
+      if(idx!==-1)q.splice(idx,1);
       if(!approachQueueTotal(qs))interQueues.delete(nk);else interQueues.set(nk,qs);
-      interPassApproach.set(nk,approach);
       interPassCount.set(nk,passCount+1);
     }
     if(reserveExitKey!==null)reservedIntersectionExits.add(reserveExitKey);
@@ -3061,7 +3057,7 @@ async function startCity(){
   markStaticDirty();
   buildDrvCache();
   // Warm-up spawn
-  for(let i=0;i<30;i++)spawnCar();
+  for(let i=0;i<45;i++)spawnCar();
   resetView();
   document.getElementById('gen-overlay').style.display='none';
   setTimeout(()=>{document.getElementById('zoom-tip').style.opacity='0';},4000);
