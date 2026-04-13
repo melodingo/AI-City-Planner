@@ -1423,18 +1423,19 @@ let fullStopStreak=0;
 const FREEZE_AFTER_FULL_STOP_TICKS=20;
 const DEADLOCK_STUCK_TICKS=16;
 const DEADLOCK_ESCAPE_STUCK_TICKS=35;
+const ENABLE_STUCK_ESCAPE=false;
 const REROUTE_STUCK_TRIGGER=10;
 const REROUTE_COOLDOWN_MIN_TICKS=20;
 const REROUTE_COOLDOWN_MAX_TICKS=50;
 const REROUTE_MAJOR_BLOCKAGE_THRESHOLD=2.6;
 const REROUTE_MAJOR_BLOCKED_STEPS=2;
 const REROUTE_LOOKAHEAD_STEPS=5;
+const ENABLE_EXIT_CLEAR_PRECHECK=false;
 const CONGESTION_TILE_THRESHOLD=1.25;
 const HOTSPOT_LIMIT=4;
 const THROUGHPUT_WINDOW_TICKS=120;
 const SIGNAL_MIN_GREEN=8;
 const SIGNAL_MAX_GREEN=20;
-const SIGNAL_PASS_PER_TICK=4;
 const stopStats={
   noRoute:0,
   blocked:0,
@@ -1930,9 +1931,7 @@ function simStep(){
     };
     if(approachQueueTotal(clean))interQueues.set(k,clean);else interQueues.delete(k);
   }
-  const interPassCount=new Map();
   const movedThisTick=new Set();
-  const reservedIntersectionExits=new Set();
   let arrivalsThisTick=0;
   // Linear-time priority queue: clear intersections first, then stuck cars.
   const interFirst=[];
@@ -1967,7 +1966,7 @@ function simStep(){
       c.nextRerouteTick=tickN+c.rerouteCooldown;
     }
 
-    if(c.stuckTicks>=DEADLOCK_ESCAPE_STUCK_TICKS){
+    if(ENABLE_STUCK_ESCAPE&&c.stuckTicks>=DEADLOCK_ESCAPE_STUCK_TICKS){
       if(teleportEscape(c,occMap))continue;
     }
 
@@ -2006,15 +2005,13 @@ function simStep(){
       }
     }
     const nk=oKey(nxt.x,nxt.y);
-    let reserveExitKey=null;
     if(occupied.has(nk)){
       const other=carByPos.get(nk);
       const otherNxt=other&&other.nextStep?other.nextStep():null;
       const straightMove=(nxt.dx===0)!==(nxt.dy===0);
       const oppositeDir=otherNxt&&(nxt.dx===-otherNxt.dx&&nxt.dy===-otherNxt.dy);
       const wantsSwap=otherNxt&&otherNxt.x===c.x&&otherNxt.y===c.y;
-      const noIntersections=grid[c.y][c.x]!==INTER&&grid[nxt.y][nxt.x]!==INTER;
-      const canSwap=other&&other.id!==c.id&&other.restartDelay===0&&straightMove&&oppositeDir&&wantsSwap&&noIntersections;
+      const canSwap=other&&other.id!==c.id&&other.restartDelay===0&&straightMove&&oppositeDir&&wantsSwap;
       if(canSwap){
         const cOldK=oKey(c.x,c.y),oOldK=oKey(other.x,other.y);
         occupied.delete(cOldK);occupied.delete(oOldK);
@@ -2041,15 +2038,14 @@ function simStep(){
     if(grid[nxt.y][nxt.x]===INTER){
       // Don't block the box: only enter if immediate exit can also clear.
       const enteringIntersection=grid[c.y][c.x]!==INTER;
-      if(enteringIntersection&&c.path.length>1){
+      if(ENABLE_EXIT_CLEAR_PRECHECK&&enteringIntersection&&c.path.length>1){
         const exitStep=c.path[1];
         const exitKey=oKey(exitStep.x,exitStep.y);
-        if(occupied.has(exitKey)||reservedIntersectionExits.has(exitKey)){
+        if(occupied.has(exitKey)){
           c.tickStop(true,false);
           recordStop('intersectionLock');
           continue;
         }
-        reserveExitKey=exitKey;
       }
 
       if(!signalAllows(nxt.x,nxt.y,nxt.dx,nxt.dy)){
@@ -2065,15 +2061,11 @@ function simStep(){
       if(!q.includes(c.id))q.push(c.id);
 
       interQueues.set(nk,qs);
-      const passCount=interPassCount.get(nk)||0;
-      if(passCount>=SIGNAL_PASS_PER_TICK){c.tickStop(true,false);recordStop('intersectionLock');continue;}
 
       const idx=q.indexOf(c.id);
       if(idx!==-1)q.splice(idx,1);
       if(!approachQueueTotal(qs))interQueues.delete(nk);else interQueues.set(nk,qs);
-      interPassCount.set(nk,passCount+1);
     }
-    if(reserveExitKey!==null)reservedIntersectionExits.add(reserveExitKey);
     const oldK=oKey(c.x,c.y);
     occupied.delete(oldK);
     carByPos.delete(oldK);
