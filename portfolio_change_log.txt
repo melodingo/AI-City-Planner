@@ -108,7 +108,9 @@ Screenshot Assets
 - version_screenshots/3.3.png
 - version_screenshots/4.0.png
 - version_screenshots/5.0.png
-- version-6.png
+- version_screenshots/6.0.png
+- version_screenshots/6.5_Zoning.png
+- version_screenshots/6.5_Imporved-Buildings-and-Zones.png
 
 Notes for later portfolio writing
 

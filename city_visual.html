@@ -259,7 +259,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <button class="hbtn" id="btn-pause">Pause</button>
     <button class="hbtn" id="btn-regen">New City</button>
     <button class="hbtn" id="btn-edit-mode">Edit</button>
-    <button class="hbtn" id="btn-stop-panel-toggle">Stops</button>
+    <button class="hbtn" id="btn-stop-panel-toggle">Debug</button>
     <button class="hbtn" id="btn-export-map">Export Map</button>
     <button class="hbtn" id="btn-import-map">Import Map</button>
     <button class="hbtn" id="btn-ai-train">Train AI</button>
@@ -327,10 +327,10 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
       </div>
     </div>
   </div>
-  <div class="panel" id="stop-panel">
+  <div class="panel hidden" id="stop-panel">
     <div id="stop-panel-head">
-      <div id="stop-panel-title">STOP REASONS</div>
-      <button id="btn-stop-panel-close" title="Hide stop panel">×</button>
+      <div id="stop-panel-title">DEBUG MENU</div>
+      <button id="btn-stop-panel-close" title="Hide debug menu">×</button>
     </div>
     <div class="sr-row"><span>Stopped this tick</span><span id="sr-current">0</span></div>
     <div class="sr-row"><span>No route found</span><span id="sr-no-route">0</span></div>
@@ -338,7 +338,17 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <div class="sr-row"><span>Red signal</span><span id="sr-red">0</span></div>
     <div class="sr-row"><span>Intersection lock</span><span id="sr-lock">0</span></div>
     <div class="sr-row"><span>Freeze events</span><span id="sr-freeze">0</span></div>
-    <div class="sr-section">AI METRICS</div>
+    <div class="sr-section">SYSTEM STATE</div>
+    <div class="sr-row"><span>Active cars</span><span id="sr-active-cars">0</span></div>
+    <div class="sr-row"><span>Completed trips</span><span id="sr-completed">0</span></div>
+    <div class="sr-row"><span>Paused</span><span id="sr-paused">NO</span></div>
+    <div class="sr-row"><span>Speed multiplier</span><span id="sr-speed-mult">1.00x</span></div>
+    <div class="sr-row"><span>Metrics frozen</span><span id="sr-frozen">NO</span></div>
+    <div class="sr-row"><span>Full-stop streak</span><span id="sr-streak">0</span></div>
+    <div class="sr-row"><span>Signalized nodes</span><span id="sr-signals">0</span></div>
+    <div class="sr-row"><span>Queued intersections</span><span id="sr-queues">0</span></div>
+    <div class="sr-row"><span>Intersection locks</span><span id="sr-interlocks">0</span></div>
+    <div class="sr-section">TRAFFIC METRICS</div>
     <div class="sr-row"><span>Avg cars / tile</span><span id="sr-m-cong-avg">0.00</span></div>
     <div class="sr-row"><span>Max congestion</span><span id="sr-m-cong-max">0.00</span></div>
     <div class="sr-row"><span>Tiles above threshold</span><span id="sr-m-cong-hot">0</span></div>
@@ -3131,6 +3141,15 @@ function updateStopPanel(){
   document.getElementById('sr-red').textContent=stopStats.redSignal;
   document.getElementById('sr-lock').textContent=stopStats.intersectionLock;
   document.getElementById('sr-freeze').textContent=stopStats.freezeEvents;
+  document.getElementById('sr-active-cars').textContent=cars.length;
+  document.getElementById('sr-completed').textContent=completed.length;
+  document.getElementById('sr-paused').textContent=paused?'YES':'NO';
+  document.getElementById('sr-speed-mult').textContent=spd.toFixed(2)+'x';
+  document.getElementById('sr-frozen').textContent=metricsFrozen?'YES':'NO';
+  document.getElementById('sr-streak').textContent=fullStopStreak;
+  document.getElementById('sr-signals').textContent=signalApproach.size;
+  document.getElementById('sr-queues').textContent=interQueues.size;
+  document.getElementById('sr-interlocks').textContent=interLocks.size;
   if(!metrics||!metrics.congestion)return;
   document.getElementById('sr-m-cong-avg').textContent=metrics.congestion.averageCarsPerTile.toFixed(2);
   document.getElementById('sr-m-cong-max').textContent=metrics.congestion.maxCongestion.toFixed(2);
@@ -3525,7 +3544,7 @@ aiEl('btn-ai-train').onclick=()=>aiStartTraining();
 aiEl('btn-ai-stop').onclick=()=>aiFinishTraining(false);
 aiEl('btn-ai-apply').onclick=()=>{aiApplyLayout();};
 aiSetButtons();
-setStopPanelVisible(true);
+setStopPanelVisible(false);
 
 // ─── MAIN LOOP ────────────────────────────────────────────────────────────────
 function loop(ts){
