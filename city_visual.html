@@ -399,10 +399,10 @@ const HOURLY_DEMAND=[
   .60,.58,.60,.62,.65,.75, // 12-17 daytime→pm
   .95,.85,.55,.38,.25,.15  // 18-23 evening rush→night
 ];
-const RUSH_HOUR_MULT=1.5;
-const OFFPEAK_MULT=.55;
-const DAY_MULT=.95;
-const SPAWN_PRESSURE=.92;
+const RUSH_HOUR_MULT=1.85;
+const OFFPEAK_MULT=.65;
+const DAY_MULT=1.08;
+const SPAWN_PRESSURE=.95;
 
 // ─── ARRAYS ───────────────────────────────────────────────────────────────────
 function mk2d(h,w,v){return Array.from({length:h},()=>new Array(w).fill(v));}
@@ -1414,7 +1414,7 @@ class Car{
 }
 
 // ─── SIMULATION ───────────────────────────────────────────────────────────────
-const MAX_CARS=360;
+const MAX_CARS=500;
 let drvTilesCache=null;
 let drvByZone={};
 let interQueues=new Map();
@@ -1780,11 +1780,10 @@ function tilesForZone(z){
   return(pool&&pool.length>2)?pool:drvTilesCache;
 }
 
-function spawnCar(){
+function spawnCar(spawnChance=1){
   if(!drvTilesCache)buildDrvCache();
   if(cars.length>=MAX_CARS)return;
-  const demand=spawnDemand();
-  if(Math.random()>demand*SPAWN_PRESSURE)return;
+  if(Math.random()>spawnChance)return;
 
   const origZone=pickOriginZone();
   const destZone=pickDestZone(origZone);
@@ -1801,6 +1800,25 @@ function spawnCar(){
     if(!path||path.length<2)continue;
     const c=new Car(s.x,s.y,d.x,d.y,path);
     cars.push(c);occupied.add(oKey(s.x,s.y));return;
+  }
+}
+
+function spawnCarsForTick(){
+  if(cars.length>=MAX_CARS)return;
+  const demand=spawnDemand();
+  const chance=clamp(demand*SPAWN_PRESSURE,.05,.985);
+  const fillRatio=cars.length/Math.max(1,MAX_CARS);
+
+  let attempts=1;
+  if(demand>=.35)attempts+=1;
+  if(demand>=.65)attempts+=2;
+  if(demand>=.9)attempts+=2;
+  if(fillRatio<.55)attempts+=2;
+  else if(fillRatio<.8)attempts+=1;
+
+  for(let i=0;i<attempts;i++){
+    if(cars.length>=MAX_CARS)break;
+    spawnCar(chance);
   }
 }
 
@@ -2102,7 +2120,7 @@ function simStep(){
     fullStopStreak=0;
   }
 
-  spawnCar();
+  spawnCarsForTick();
   updateTrafficMetrics(buildOccMap(),arrivalsThisTick);
 }
 
@@ -3049,7 +3067,7 @@ async function startCity(){
   markStaticDirty();
   buildDrvCache();
   // Warm-up spawn
-  for(let i=0;i<45;i++)spawnCar();
+  for(let i=0;i<280;i++)spawnCar();
   resetView();
   document.getElementById('gen-overlay').style.display='none';
   setTimeout(()=>{document.getElementById('zoom-tip').style.opacity='0';},4000);
