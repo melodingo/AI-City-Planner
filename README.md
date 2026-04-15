@@ -1,5 +1,39 @@
 # AI City Planner
 
+## Table of Contents
+
+- [Why This Project Exists](#why-this-project-exists)
+- [Latest Updates (Apr 2026)](#latest-updates-apr-2026)
+  - [Browser release V7](#browser-release-v7)
+  - [Browser release V6.5](#browser-release-v65)
+  - [Browser release V6.4](#browser-release-v64)
+  - [Browser release V6.3](#browser-release-v63)
+  - [Browser release V6.2](#browser-release-v62)
+- [High-Level Architecture](#high-level-architecture)
+- [Repository Map](#repository-map)
+  - [Core Python modules](#core-python-modules)
+  - [Browser simulator](#browser-simulator)
+  - [City generation theory](#city-generation-theory)
+- [Python Runtime Flow](#python-runtime-flow)
+- [Data Model Summary](#data-model-summary)
+  - [Grid state](#grid-state)
+  - [Vehicle state](#vehicle-state)
+  - [Metrics tracked](#metrics-tracked)
+- [Optimization Strategy (Current)](#optimization-strategy-current)
+- [CLI Usage](#cli-usage)
+  - [1) Install dependencies](#1-install-dependencies)
+  - [2) Run optimization (default workflow)](#2-run-optimization-default-workflow)
+  - [3) Useful optimization variants](#3-useful-optimization-variants)
+  - [4) Other modes](#4-other-modes)
+- [External RL Training (Headless)](#external-rl-training-headless)
+  - [Quick start](#quick-start)
+  - [RL math used](#rl-math-used)
+- [Browser Simulator Notes](#browser-simulator-notes)
+  - [Train AI button bridge (external Python)](#train-ai-button-bridge-external-python)
+- [Extension Points](#extension-points)
+- [Known Constraints](#known-constraints)
+- [Project Status](#project-status)
+
 AI City Planner is a traffic-simulation and layout-optimization project with two execution surfaces:
 
 - A Python optimization stack for repeatable experiments.
