@@ -1,7 +1,7 @@
 {
   "algorithm": "linear_double_q",
   "config": {
-    "episodes": 2,
+    "episodes": 100,
     "episode_length": 250,
     "width": 20,
     "height": 20,
@@ -18,7 +18,7 @@
     "save_path": "C:\\Users\\samue\\OneDrive\\Documents\\GitHub\\AI-City-Planner\\models\\linear_double_q_weights.npz"
   },
   "result": {
-    "best_eval_reward": -114.68333334286991,
-    "best_episode": 2.0
+    "best_eval_reward": -126.59666667626283,
+    "best_episode": 50.0
   }
 }

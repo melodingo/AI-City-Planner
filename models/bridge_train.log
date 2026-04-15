@@ -67,3 +67,646 @@ Episode 10/100 started
 Episode 10/100 | step 50/250 | reward   -10.856 | epsilon 0.241 | mean|TD| 1.3754
 Episode 10/100 | step 100/250 | reward    -8.596 | epsilon 0.241 | mean|TD| 1.0745
 Episode 10/100 | step 150/250 | reward   -31.568 | epsilon 0.241 | mean|TD| 1.0653
+Episode 10/100 | step 200/250 | reward   -53.154 | epsilon 0.241 | mean|TD| 0.9776
+Episode 10/100 | step 250/250 | reward   -87.330 | epsilon 0.241 | mean|TD| 1.0016
+Episode   10/100 | reward   -87.330 | epsilon 0.241 | mean|TD| 1.0016
+Episode 11/100 started
+Episode 11/100 | step 50/250 | reward   -13.720 | epsilon 0.240 | mean|TD| 1.3705
+Episode 11/100 | step 100/250 | reward   -29.450 | epsilon 0.240 | mean|TD| 1.1239
+Episode 11/100 | step 150/250 | reward   -37.088 | epsilon 0.240 | mean|TD| 0.9447
+Episode 11/100 | step 200/250 | reward   -60.434 | epsilon 0.240 | mean|TD| 0.8783
+Episode 11/100 | step 250/250 | reward   -83.886 | epsilon 0.240 | mean|TD| 0.9460
+Episode   11/100 | reward   -83.886 | epsilon 0.240 | mean|TD| 0.9460
+Episode 12/100 started
+Episode 12/100 | step 50/250 | reward   -28.588 | epsilon 0.239 | mean|TD| 1.5304
+Episode 12/100 | step 100/250 | reward   -35.836 | epsilon 0.239 | mean|TD| 1.2858
+Episode 12/100 | step 150/250 | reward   -60.890 | epsilon 0.239 | mean|TD| 1.1366
+Episode 12/100 | step 200/250 | reward  -100.270 | epsilon 0.239 | mean|TD| 1.0532
+Episode 12/100 | step 250/250 | reward  -142.624 | epsilon 0.239 | mean|TD| 1.0883
+Episode   12/100 | reward  -142.624 | epsilon 0.239 | mean|TD| 1.0883
+Episode 13/100 started
+Episode 13/100 | step 50/250 | reward   -28.896 | epsilon 0.238 | mean|TD| 1.4950
+Episode 13/100 | step 100/250 | reward   -51.214 | epsilon 0.238 | mean|TD| 1.3020
+Episode 13/100 | step 150/250 | reward   -84.786 | epsilon 0.238 | mean|TD| 1.1574
+Episode 13/100 | step 200/250 | reward  -130.878 | epsilon 0.238 | mean|TD| 1.0956
+Episode 13/100 | step 250/250 | reward  -177.802 | epsilon 0.238 | mean|TD| 1.1527
+Episode   13/100 | reward  -177.802 | epsilon 0.238 | mean|TD| 1.1527
+Episode 14/100 started
+Episode 14/100 | step 50/250 | reward   -23.994 | epsilon 0.237 | mean|TD| 1.2352
+Episode 14/100 | step 100/250 | reward   -40.458 | epsilon 0.237 | mean|TD| 1.1535
+Episode 14/100 | step 150/250 | reward   -64.744 | epsilon 0.237 | mean|TD| 1.0673
+Episode 14/100 | step 200/250 | reward   -92.040 | epsilon 0.237 | mean|TD| 0.9753
+Episode 14/100 | step 250/250 | reward  -129.484 | epsilon 0.237 | mean|TD| 1.0327
+Episode   14/100 | reward  -129.484 | epsilon 0.237 | mean|TD| 1.0327
+Episode 15/100 started
+Episode 15/100 | step 50/250 | reward   -23.654 | epsilon 0.236 | mean|TD| 0.9972
+Episode 15/100 | step 100/250 | reward   -34.842 | epsilon 0.236 | mean|TD| 1.0583
+Episode 15/100 | step 150/250 | reward   -53.122 | epsilon 0.236 | mean|TD| 0.9626
+Episode 15/100 | step 200/250 | reward   -86.080 | epsilon 0.236 | mean|TD| 0.8672
+Episode 15/100 | step 250/250 | reward  -121.126 | epsilon 0.236 | mean|TD| 0.8795
+Episode   15/100 | reward  -121.126 | epsilon 0.236 | mean|TD| 0.8795
+Episode 16/100 started
+Episode 16/100 | step 50/250 | reward   -12.946 | epsilon 0.235 | mean|TD| 1.1967
+Episode 16/100 | step 100/250 | reward   -26.996 | epsilon 0.235 | mean|TD| 1.0943
+Episode 16/100 | step 150/250 | reward   -58.710 | epsilon 0.235 | mean|TD| 0.9820
+Episode 16/100 | step 200/250 | reward   -95.790 | epsilon 0.235 | mean|TD| 0.8323
+Episode 16/100 | step 250/250 | reward  -131.940 | epsilon 0.235 | mean|TD| 0.8349
+Episode   16/100 | reward  -131.940 | epsilon 0.235 | mean|TD| 0.8349
+Episode 17/100 started
+Episode 17/100 | step 50/250 | reward   -22.566 | epsilon 0.234 | mean|TD| 2.5803
+Episode 17/100 | step 100/250 | reward   -40.104 | epsilon 0.234 | mean|TD| 1.8789
+Episode 17/100 | step 150/250 | reward   -50.962 | epsilon 0.234 | mean|TD| 1.5987
+Episode 17/100 | step 200/250 | reward   -62.464 | epsilon 0.234 | mean|TD| 1.3787
+Episode 17/100 | step 250/250 | reward   -81.330 | epsilon 0.234 | mean|TD| 1.3819
+Episode   17/100 | reward   -81.330 | epsilon 0.234 | mean|TD| 1.3819
+Episode 18/100 started
+Episode 18/100 | step 50/250 | reward   -23.296 | epsilon 0.233 | mean|TD| 1.5006
+Episode 18/100 | step 100/250 | reward   -50.142 | epsilon 0.233 | mean|TD| 1.3225
+Episode 18/100 | step 150/250 | reward   -78.162 | epsilon 0.233 | mean|TD| 1.1363
+Episode 18/100 | step 200/250 | reward  -103.044 | epsilon 0.233 | mean|TD| 1.0309
+Episode 18/100 | step 250/250 | reward  -134.600 | epsilon 0.233 | mean|TD| 1.0769
+Episode   18/100 | reward  -134.600 | epsilon 0.233 | mean|TD| 1.0769
+Episode 19/100 started
+Episode 19/100 | step 50/250 | reward   -17.778 | epsilon 0.233 | mean|TD| 2.0335
+Episode 19/100 | step 100/250 | reward   -25.228 | epsilon 0.233 | mean|TD| 1.4747
+Episode 19/100 | step 150/250 | reward   -53.086 | epsilon 0.233 | mean|TD| 1.2781
+Episode 19/100 | step 200/250 | reward   -87.664 | epsilon 0.233 | mean|TD| 1.1177
+Episode 19/100 | step 250/250 | reward  -125.782 | epsilon 0.233 | mean|TD| 1.1194
+Episode   19/100 | reward  -125.782 | epsilon 0.233 | mean|TD| 1.1194
+Episode 20/100 started
+Episode 20/100 | step 50/250 | reward   -13.050 | epsilon 0.232 | mean|TD| 1.2674
+Episode 20/100 | step 100/250 | reward   -23.624 | epsilon 0.232 | mean|TD| 1.1666
+Episode 20/100 | step 150/250 | reward   -43.820 | epsilon 0.232 | mean|TD| 1.0382
+Episode 20/100 | step 200/250 | reward   -71.798 | epsilon 0.232 | mean|TD| 0.9311
+Episode 20/100 | step 250/250 | reward  -107.284 | epsilon 0.232 | mean|TD| 0.9411
+Episode   20/100 | reward  -107.284 | epsilon 0.232 | mean|TD| 0.9411
+Episode 21/100 started
+Episode 21/100 | step 50/250 | reward   -11.672 | epsilon 0.231 | mean|TD| 1.2348
+Episode 21/100 | step 100/250 | reward   -18.136 | epsilon 0.231 | mean|TD| 1.2185
+Episode 21/100 | step 150/250 | reward   -35.116 | epsilon 0.231 | mean|TD| 1.0758
+Episode 21/100 | step 200/250 | reward   -55.880 | epsilon 0.231 | mean|TD| 0.9661
+Episode 21/100 | step 250/250 | reward   -80.174 | epsilon 0.231 | mean|TD| 1.0210
+Episode   21/100 | reward   -80.174 | epsilon 0.231 | mean|TD| 1.0210
+Episode 22/100 started
+Episode 22/100 | step 50/250 | reward   -15.386 | epsilon 0.230 | mean|TD| 2.7209
+Episode 22/100 | step 100/250 | reward   -39.382 | epsilon 0.230 | mean|TD| 1.7356
+Episode 22/100 | step 150/250 | reward   -61.152 | epsilon 0.230 | mean|TD| 1.5279
+Episode 22/100 | step 200/250 | reward   -84.068 | epsilon 0.230 | mean|TD| 1.4117
+Episode 22/100 | step 250/250 | reward   -92.736 | epsilon 0.230 | mean|TD| 1.5136
+Episode   22/100 | reward   -92.736 | epsilon 0.230 | mean|TD| 1.5136
+Episode 23/100 started
+Episode 23/100 | step 50/250 | reward   -31.258 | epsilon 0.229 | mean|TD| 1.2742
+Episode 23/100 | step 100/250 | reward   -70.304 | epsilon 0.229 | mean|TD| 1.2951
+Episode 23/100 | step 150/250 | reward  -103.936 | epsilon 0.229 | mean|TD| 1.2119
+Episode 23/100 | step 200/250 | reward  -156.192 | epsilon 0.229 | mean|TD| 1.1169
+Episode 23/100 | step 250/250 | reward  -209.812 | epsilon 0.229 | mean|TD| 1.1873
+Episode   23/100 | reward  -209.812 | epsilon 0.229 | mean|TD| 1.1873
+Episode 24/100 started
+Episode 24/100 | step 50/250 | reward   -20.360 | epsilon 0.228 | mean|TD| 1.3649
+Episode 24/100 | step 100/250 | reward   -40.082 | epsilon 0.228 | mean|TD| 1.2021
+Episode 24/100 | step 150/250 | reward   -55.232 | epsilon 0.228 | mean|TD| 1.1232
+Episode 24/100 | step 200/250 | reward   -89.828 | epsilon 0.228 | mean|TD| 1.0764
+Episode 24/100 | step 250/250 | reward  -127.796 | epsilon 0.228 | mean|TD| 1.2311
+Episode   24/100 | reward  -127.796 | epsilon 0.228 | mean|TD| 1.2311
+Episode 25/100 started
+Episode 25/100 | step 50/250 | reward   -20.058 | epsilon 0.227 | mean|TD| 3.3520
+Episode 25/100 | step 100/250 | reward   -45.274 | epsilon 0.227 | mean|TD| 2.1874
+Episode 25/100 | step 150/250 | reward   -74.802 | epsilon 0.227 | mean|TD| 1.6840
+Episode 25/100 | step 200/250 | reward  -106.468 | epsilon 0.227 | mean|TD| 1.4638
+Episode 25/100 | step 250/250 | reward  -144.662 | epsilon 0.227 | mean|TD| 1.5015
+Episode   25/100 | reward  -144.662 | epsilon 0.227 | mean|TD| 1.5015
+  Eval over 3 episodes: -136.197
+  New best model saved to C:\Users\samue\OneDrive\Documents\GitHub\AI-City-Planner\models\linear_double_q_weights.npz
+Episode 26/100 started
+Episode 26/100 | step 50/250 | reward   -23.192 | epsilon 0.226 | mean|TD| 1.9800
+Episode 26/100 | step 100/250 | reward   -43.924 | epsilon 0.226 | mean|TD| 1.5548
+Episode 26/100 | step 150/250 | reward   -77.482 | epsilon 0.226 | mean|TD| 1.3712
+Episode 26/100 | step 200/250 | reward  -111.432 | epsilon 0.226 | mean|TD| 1.2467
+Episode 26/100 | step 250/250 | reward  -156.302 | epsilon 0.226 | mean|TD| 1.3123
+Episode   26/100 | reward  -156.302 | epsilon 0.226 | mean|TD| 1.3123
+Episode 27/100 started
+Episode 27/100 | step 50/250 | reward   -10.738 | epsilon 0.225 | mean|TD| 1.6596
+Episode 27/100 | step 100/250 | reward   -24.822 | epsilon 0.225 | mean|TD| 1.4663
+Episode 27/100 | step 150/250 | reward   -45.260 | epsilon 0.225 | mean|TD| 1.2591
+Episode 27/100 | step 200/250 | reward   -68.044 | epsilon 0.225 | mean|TD| 1.1861
+Episode 27/100 | step 250/250 | reward  -103.164 | epsilon 0.225 | mean|TD| 1.2245
+Episode   27/100 | reward  -103.164 | epsilon 0.225 | mean|TD| 1.2245
+Episode 28/100 started
+Episode 28/100 | step 50/250 | reward   -11.002 | epsilon 0.224 | mean|TD| 3.2487
+Episode 28/100 | step 100/250 | reward   -27.082 | epsilon 0.224 | mean|TD| 2.1463
+Episode 28/100 | step 150/250 | reward   -48.530 | epsilon 0.224 | mean|TD| 1.8259
+Episode 28/100 | step 200/250 | reward   -84.004 | epsilon 0.224 | mean|TD| 1.6759
+Episode 28/100 | step 250/250 | reward  -123.302 | epsilon 0.224 | mean|TD| 1.7044
+Episode   28/100 | reward  -123.302 | epsilon 0.224 | mean|TD| 1.7044
+Episode 29/100 started
+Episode 29/100 | step 50/250 | reward   -12.120 | epsilon 0.223 | mean|TD| 2.8494
+Episode 29/100 | step 100/250 | reward   -27.558 | epsilon 0.223 | mean|TD| 1.9684
+Episode 29/100 | step 150/250 | reward   -49.010 | epsilon 0.223 | mean|TD| 1.6342
+Episode 29/100 | step 200/250 | reward   -83.630 | epsilon 0.223 | mean|TD| 1.7742
+Episode 29/100 | step 250/250 | reward  -117.078 | epsilon 0.223 | mean|TD| 2.1116
+Episode   29/100 | reward  -117.078 | epsilon 0.223 | mean|TD| 2.1116
+Episode 30/100 started
+Episode 30/100 | step 50/250 | reward   -27.192 | epsilon 0.222 | mean|TD| 1.0608
+Episode 30/100 | step 100/250 | reward   -51.176 | epsilon 0.222 | mean|TD| 1.1042
+Episode 30/100 | step 150/250 | reward   -61.256 | epsilon 0.222 | mean|TD| 1.4733
+Episode 30/100 | step 200/250 | reward   -72.706 | epsilon 0.222 | mean|TD| 1.8721
+Episode 30/100 | step 250/250 | reward   -99.572 | epsilon 0.222 | mean|TD| 2.6037
+Episode   30/100 | reward   -99.572 | epsilon 0.222 | mean|TD| 2.6037
+Episode 31/100 started
+Episode 31/100 | step 50/250 | reward   -33.904 | epsilon 0.221 | mean|TD| 1.6965
+Episode 31/100 | step 100/250 | reward   -61.664 | epsilon 0.221 | mean|TD| 1.8004
+Episode 31/100 | step 150/250 | reward   -74.718 | epsilon 0.221 | mean|TD| 1.7616
+Episode 31/100 | step 200/250 | reward   -85.820 | epsilon 0.221 | mean|TD| 1.7716
+Episode 31/100 | step 250/250 | reward  -105.932 | epsilon 0.221 | mean|TD| 1.8245
+Episode   31/100 | reward  -105.932 | epsilon 0.221 | mean|TD| 1.8245
+Episode 32/100 started
+Episode 32/100 | step 50/250 | reward    -3.406 | epsilon 0.221 | mean|TD| 0.9445
+Episode 32/100 | step 100/250 | reward   -12.074 | epsilon 0.221 | mean|TD| 1.0208
+Episode 32/100 | step 150/250 | reward   -16.762 | epsilon 0.221 | mean|TD| 1.0615
+Episode 32/100 | step 200/250 | reward   -29.958 | epsilon 0.221 | mean|TD| 1.0333
+Episode 32/100 | step 250/250 | reward   -43.850 | epsilon 0.221 | mean|TD| 1.1444
+Episode   32/100 | reward   -43.850 | epsilon 0.221 | mean|TD| 1.1444
+Episode 33/100 started
+Episode 33/100 | step 50/250 | reward   -11.314 | epsilon 0.220 | mean|TD| 2.1440
+Episode 33/100 | step 100/250 | reward   -18.316 | epsilon 0.220 | mean|TD| 1.5376
+Episode 33/100 | step 150/250 | reward   -32.620 | epsilon 0.220 | mean|TD| 1.2996
+Episode 33/100 | step 200/250 | reward   -51.002 | epsilon 0.220 | mean|TD| 1.1906
+Episode 33/100 | step 250/250 | reward   -79.974 | epsilon 0.220 | mean|TD| 1.2507
+Episode   33/100 | reward   -79.974 | epsilon 0.220 | mean|TD| 1.2507
+Episode 34/100 started
+Episode 34/100 | step 50/250 | reward   -35.876 | epsilon 0.219 | mean|TD| 1.7298
+Episode 34/100 | step 100/250 | reward   -75.468 | epsilon 0.219 | mean|TD| 1.5546
+Episode 34/100 | step 150/250 | reward  -131.768 | epsilon 0.219 | mean|TD| 1.3897
+Episode 34/100 | step 200/250 | reward  -192.892 | epsilon 0.219 | mean|TD| 1.2957
+Episode 34/100 | step 250/250 | reward  -253.956 | epsilon 0.219 | mean|TD| 1.3499
+Episode   34/100 | reward  -253.956 | epsilon 0.219 | mean|TD| 1.3499
+Episode 35/100 started
+Episode 35/100 | step 50/250 | reward   -14.396 | epsilon 0.218 | mean|TD| 2.7088
+Episode 35/100 | step 100/250 | reward   -11.106 | epsilon 0.218 | mean|TD| 1.8082
+Episode 35/100 | step 150/250 | reward    -9.040 | epsilon 0.218 | mean|TD| 1.5624
+Episode 35/100 | step 200/250 | reward   -27.916 | epsilon 0.218 | mean|TD| 1.5150
+Episode 35/100 | step 250/250 | reward   -46.130 | epsilon 0.218 | mean|TD| 1.5067
+Episode   35/100 | reward   -46.130 | epsilon 0.218 | mean|TD| 1.5067
+Episode 36/100 started
+Episode 36/100 | step 50/250 | reward   -12.486 | epsilon 0.217 | mean|TD| 1.5777
+Episode 36/100 | step 100/250 | reward   -17.450 | epsilon 0.217 | mean|TD| 1.3287
+Episode 36/100 | step 150/250 | reward   -28.530 | epsilon 0.217 | mean|TD| 1.3142
+Episode 36/100 | step 200/250 | reward   -50.720 | epsilon 0.217 | mean|TD| 1.3693
+Episode 36/100 | step 250/250 | reward   -87.118 | epsilon 0.217 | mean|TD| 1.4296
+Episode   36/100 | reward   -87.118 | epsilon 0.217 | mean|TD| 1.4296
+Episode 37/100 started
+Episode 37/100 | step 50/250 | reward   -15.868 | epsilon 0.216 | mean|TD| 1.6599
+Episode 37/100 | step 100/250 | reward   -33.668 | epsilon 0.216 | mean|TD| 1.3309
+Episode 37/100 | step 150/250 | reward   -58.070 | epsilon 0.216 | mean|TD| 1.1362
+Episode 37/100 | step 200/250 | reward   -84.792 | epsilon 0.216 | mean|TD| 1.0791
+Episode 37/100 | step 250/250 | reward  -123.016 | epsilon 0.216 | mean|TD| 1.1117
+Episode   37/100 | reward  -123.016 | epsilon 0.216 | mean|TD| 1.1117
+Episode 38/100 started
+Episode 38/100 | step 50/250 | reward   -14.784 | epsilon 0.215 | mean|TD| 2.4453
+Episode 38/100 | step 100/250 | reward   -32.346 | epsilon 0.215 | mean|TD| 1.7129
+Episode 38/100 | step 150/250 | reward   -40.792 | epsilon 0.215 | mean|TD| 1.3764
+Episode 38/100 | step 200/250 | reward   -44.182 | epsilon 0.215 | mean|TD| 1.2442
+Episode 38/100 | step 250/250 | reward   -66.064 | epsilon 0.215 | mean|TD| 1.2942
+Episode   38/100 | reward   -66.064 | epsilon 0.215 | mean|TD| 1.2942
+Episode 39/100 started
+Episode 39/100 | step 50/250 | reward    -9.784 | epsilon 0.214 | mean|TD| 1.2530
+Episode 39/100 | step 100/250 | reward   -11.720 | epsilon 0.214 | mean|TD| 1.2429
+Episode 39/100 | step 150/250 | reward   -19.388 | epsilon 0.214 | mean|TD| 1.1734
+Episode 39/100 | step 200/250 | reward   -32.882 | epsilon 0.214 | mean|TD| 1.0441
+Episode 39/100 | step 250/250 | reward   -52.206 | epsilon 0.214 | mean|TD| 1.1025
+Episode   39/100 | reward   -52.206 | epsilon 0.214 | mean|TD| 1.1025
+Episode 40/100 started
+Episode 40/100 | step 50/250 | reward    -2.790 | epsilon 0.213 | mean|TD| 2.6622
+Episode 40/100 | step 100/250 | reward    -1.276 | epsilon 0.213 | mean|TD| 1.9335
+Episode 40/100 | step 150/250 | reward    -1.524 | epsilon 0.213 | mean|TD| 1.5318
+Episode 40/100 | step 200/250 | reward   -17.592 | epsilon 0.213 | mean|TD| 1.3422
+Episode 40/100 | step 250/250 | reward   -41.334 | epsilon 0.213 | mean|TD| 1.4102
+Episode   40/100 | reward   -41.334 | epsilon 0.213 | mean|TD| 1.4102
+Episode 41/100 started
+Episode 41/100 | step 50/250 | reward    -6.464 | epsilon 0.212 | mean|TD| 1.7324
+Episode 41/100 | step 100/250 | reward    -6.512 | epsilon 0.212 | mean|TD| 1.4327
+Episode 41/100 | step 150/250 | reward    -7.024 | epsilon 0.212 | mean|TD| 1.2541
+Episode 41/100 | step 200/250 | reward    -4.244 | epsilon 0.212 | mean|TD| 1.1521
+Episode 41/100 | step 250/250 | reward   -13.722 | epsilon 0.212 | mean|TD| 1.2045
+Episode   41/100 | reward   -13.722 | epsilon 0.212 | mean|TD| 1.2045
+Episode 42/100 started
+Episode 42/100 | step 50/250 | reward   -12.350 | epsilon 0.211 | mean|TD| 0.9303
+Episode 42/100 | step 100/250 | reward   -28.584 | epsilon 0.211 | mean|TD| 0.9387
+Episode 42/100 | step 150/250 | reward   -52.994 | epsilon 0.211 | mean|TD| 0.9528
+Episode 42/100 | step 200/250 | reward   -90.512 | epsilon 0.211 | mean|TD| 1.1588
+Episode 42/100 | step 250/250 | reward  -129.930 | epsilon 0.211 | mean|TD| 1.2538
+Episode   42/100 | reward  -129.930 | epsilon 0.211 | mean|TD| 1.2538
+Episode 43/100 started
+Episode 43/100 | step 50/250 | reward   -10.438 | epsilon 0.210 | mean|TD| 2.7944
+Episode 43/100 | step 100/250 | reward   -18.410 | epsilon 0.210 | mean|TD| 2.0987
+Episode 43/100 | step 150/250 | reward   -25.370 | epsilon 0.210 | mean|TD| 1.6574
+Episode 43/100 | step 200/250 | reward   -41.742 | epsilon 0.210 | mean|TD| 1.4350
+Episode 43/100 | step 250/250 | reward   -67.198 | epsilon 0.210 | mean|TD| 1.5132
+Episode   43/100 | reward   -67.198 | epsilon 0.210 | mean|TD| 1.5132
+Episode 44/100 started
+Episode 44/100 | step 50/250 | reward   -15.514 | epsilon 0.210 | mean|TD| 1.6591
+Episode 44/100 | step 100/250 | reward    -7.368 | epsilon 0.210 | mean|TD| 1.5141
+Episode 44/100 | step 150/250 | reward   -14.286 | epsilon 0.210 | mean|TD| 1.3437
+Episode 44/100 | step 200/250 | reward   -35.746 | epsilon 0.210 | mean|TD| 1.1636
+Episode 44/100 | step 250/250 | reward   -55.328 | epsilon 0.210 | mean|TD| 1.2641
+Episode   44/100 | reward   -55.328 | epsilon 0.210 | mean|TD| 1.2641
+Episode 45/100 started
+Episode 45/100 | step 50/250 | reward    -9.834 | epsilon 0.209 | mean|TD| 2.4441
+Episode 45/100 | step 100/250 | reward   -24.496 | epsilon 0.209 | mean|TD| 1.7053
+Episode 45/100 | step 150/250 | reward   -50.446 | epsilon 0.209 | mean|TD| 1.5139
+Episode 45/100 | step 200/250 | reward   -77.230 | epsilon 0.209 | mean|TD| 2.1286
+Episode 45/100 | step 250/250 | reward  -105.260 | epsilon 0.209 | mean|TD| 2.4659
+Episode   45/100 | reward  -105.260 | epsilon 0.209 | mean|TD| 2.4659
+Episode 46/100 started
+Episode 46/100 | step 50/250 | reward   -23.014 | epsilon 0.208 | mean|TD| 1.8741
+Episode 46/100 | step 100/250 | reward   -46.042 | epsilon 0.208 | mean|TD| 1.5609
+Episode 46/100 | step 150/250 | reward   -65.340 | epsilon 0.208 | mean|TD| 1.3905
+Episode 46/100 | step 200/250 | reward   -88.916 | epsilon 0.208 | mean|TD| 1.3184
+Episode 46/100 | step 250/250 | reward  -126.960 | epsilon 0.208 | mean|TD| 1.3734
+Episode   46/100 | reward  -126.960 | epsilon 0.208 | mean|TD| 1.3734
+Episode 47/100 started
+Episode 47/100 | step 50/250 | reward   -24.602 | epsilon 0.207 | mean|TD| 2.1194
+Episode 47/100 | step 100/250 | reward   -40.328 | epsilon 0.207 | mean|TD| 1.6213
+Episode 47/100 | step 150/250 | reward   -56.092 | epsilon 0.207 | mean|TD| 1.4215
+Episode 47/100 | step 200/250 | reward   -69.482 | epsilon 0.207 | mean|TD| 1.3252
+Episode 47/100 | step 250/250 | reward   -93.290 | epsilon 0.207 | mean|TD| 1.4574
+Episode   47/100 | reward   -93.290 | epsilon 0.207 | mean|TD| 1.4574
+Episode 48/100 started
+Episode 48/100 | step 50/250 | reward   -21.854 | epsilon 0.206 | mean|TD| 1.5536
+Episode 48/100 | step 100/250 | reward   -28.752 | epsilon 0.206 | mean|TD| 1.3650
+Episode 48/100 | step 150/250 | reward   -44.254 | epsilon 0.206 | mean|TD| 1.2345
+Episode 48/100 | step 200/250 | reward   -71.600 | epsilon 0.206 | mean|TD| 1.1148
+Episode 48/100 | step 250/250 | reward  -105.152 | epsilon 0.206 | mean|TD| 1.1312
+Episode   48/100 | reward  -105.152 | epsilon 0.206 | mean|TD| 1.1312
+Episode 49/100 started
+Episode 49/100 | step 50/250 | reward    -8.790 | epsilon 0.205 | mean|TD| 1.9133
+Episode 49/100 | step 100/250 | reward    -3.850 | epsilon 0.205 | mean|TD| 1.4263
+Episode 49/100 | step 150/250 | reward    -7.818 | epsilon 0.205 | mean|TD| 1.1494
+Episode 49/100 | step 200/250 | reward   -33.180 | epsilon 0.205 | mean|TD| 1.0606
+Episode 49/100 | step 250/250 | reward   -63.698 | epsilon 0.205 | mean|TD| 1.1535
+Episode   49/100 | reward   -63.698 | epsilon 0.205 | mean|TD| 1.1535
+Episode 50/100 started
+Episode 50/100 | step 50/250 | reward   -25.738 | epsilon 0.204 | mean|TD| 1.4759
+Episode 50/100 | step 100/250 | reward   -37.496 | epsilon 0.204 | mean|TD| 1.3508
+Episode 50/100 | step 150/250 | reward   -60.926 | epsilon 0.204 | mean|TD| 1.2192
+Episode 50/100 | step 200/250 | reward   -88.676 | epsilon 0.204 | mean|TD| 1.2275
+Episode 50/100 | step 250/250 | reward  -120.494 | epsilon 0.204 | mean|TD| 1.3295
+Episode   50/100 | reward  -120.494 | epsilon 0.204 | mean|TD| 1.3295
+  Eval over 3 episodes: -126.597
+  New best model saved to C:\Users\samue\OneDrive\Documents\GitHub\AI-City-Planner\models\linear_double_q_weights.npz
+Episode 51/100 started
+Episode 51/100 | step 50/250 | reward   -11.186 | epsilon 0.203 | mean|TD| 2.3536
+Episode 51/100 | step 100/250 | reward   -12.492 | epsilon 0.203 | mean|TD| 1.6620
+Episode 51/100 | step 150/250 | reward   -16.708 | epsilon 0.203 | mean|TD| 1.4201
+Episode 51/100 | step 200/250 | reward   -28.598 | epsilon 0.203 | mean|TD| 1.2522
+Episode 51/100 | step 250/250 | reward   -41.468 | epsilon 0.203 | mean|TD| 1.3036
+Episode   51/100 | reward   -41.468 | epsilon 0.203 | mean|TD| 1.3036
+Episode 52/100 started
+Episode 52/100 | step 50/250 | reward   -10.330 | epsilon 0.202 | mean|TD| 1.5013
+Episode 52/100 | step 100/250 | reward   -27.882 | epsilon 0.202 | mean|TD| 1.4286
+Episode 52/100 | step 150/250 | reward   -55.084 | epsilon 0.202 | mean|TD| 1.1959
+Episode 52/100 | step 200/250 | reward   -93.346 | epsilon 0.202 | mean|TD| 1.1384
+Episode 52/100 | step 250/250 | reward  -133.314 | epsilon 0.202 | mean|TD| 1.1459
+Episode   52/100 | reward  -133.314 | epsilon 0.202 | mean|TD| 1.1459
+Episode 53/100 started
+Episode 53/100 | step 50/250 | reward    -8.206 | epsilon 0.201 | mean|TD| 1.7102
+Episode 53/100 | step 100/250 | reward   -18.422 | epsilon 0.201 | mean|TD| 1.6436
+Episode 53/100 | step 150/250 | reward   -40.906 | epsilon 0.201 | mean|TD| 1.6005
+Episode 53/100 | step 200/250 | reward   -63.060 | epsilon 0.201 | mean|TD| 1.4810
+Episode 53/100 | step 250/250 | reward   -94.820 | epsilon 0.201 | mean|TD| 1.6591
+Episode   53/100 | reward   -94.820 | epsilon 0.201 | mean|TD| 1.6591
+Episode 54/100 started
+Episode 54/100 | step 50/250 | reward   -24.816 | epsilon 0.200 | mean|TD| 2.0838
+Episode 54/100 | step 100/250 | reward   -42.320 | epsilon 0.200 | mean|TD| 1.7499
+Episode 54/100 | step 150/250 | reward   -82.378 | epsilon 0.200 | mean|TD| 1.5621
+Episode 54/100 | step 200/250 | reward  -132.374 | epsilon 0.200 | mean|TD| 1.3566
+Episode 54/100 | step 250/250 | reward  -182.416 | epsilon 0.200 | mean|TD| 1.4011
+Episode   54/100 | reward  -182.416 | epsilon 0.200 | mean|TD| 1.4011
+Episode 55/100 started
+Episode 55/100 | step 50/250 | reward    -8.468 | epsilon 0.199 | mean|TD| 2.1381
+Episode 55/100 | step 100/250 | reward   -27.414 | epsilon 0.199 | mean|TD| 1.8772
+Episode 55/100 | step 150/250 | reward   -49.094 | epsilon 0.199 | mean|TD| 1.5581
+Episode 55/100 | step 200/250 | reward   -74.042 | epsilon 0.199 | mean|TD| 1.3783
+Episode 55/100 | step 250/250 | reward  -106.974 | epsilon 0.199 | mean|TD| 1.4699
+Episode   55/100 | reward  -106.974 | epsilon 0.199 | mean|TD| 1.4699
+Episode 56/100 started
+Episode 56/100 | step 50/250 | reward   -33.146 | epsilon 0.198 | mean|TD| 2.2169
+Episode 56/100 | step 100/250 | reward   -41.718 | epsilon 0.198 | mean|TD| 1.8244
+Episode 56/100 | step 150/250 | reward   -55.874 | epsilon 0.198 | mean|TD| 1.5342
+Episode 56/100 | step 200/250 | reward   -78.292 | epsilon 0.198 | mean|TD| 1.3569
+Episode 56/100 | step 250/250 | reward  -106.052 | epsilon 0.198 | mean|TD| 1.4304
+Episode   56/100 | reward  -106.052 | epsilon 0.198 | mean|TD| 1.4304
+Episode 57/100 started
+Episode 57/100 | step 50/250 | reward   -30.000 | epsilon 0.198 | mean|TD| 1.9243
+Episode 57/100 | step 100/250 | reward   -59.210 | epsilon 0.198 | mean|TD| 1.6854
+Episode 57/100 | step 150/250 | reward   -95.992 | epsilon 0.198 | mean|TD| 1.3934
+Episode 57/100 | step 200/250 | reward  -139.876 | epsilon 0.198 | mean|TD| 1.1015
+Episode 57/100 | step 250/250 | reward  -183.954 | epsilon 0.198 | mean|TD| 1.1687
+Episode   57/100 | reward  -183.954 | epsilon 0.198 | mean|TD| 1.1687
+Episode 58/100 started
+Episode 58/100 | step 50/250 | reward   -27.266 | epsilon 0.197 | mean|TD| 2.2388
+Episode 58/100 | step 100/250 | reward   -52.066 | epsilon 0.197 | mean|TD| 1.8482
+Episode 58/100 | step 150/250 | reward   -67.306 | epsilon 0.197 | mean|TD| 1.6848
+Episode 58/100 | step 200/250 | reward   -95.472 | epsilon 0.197 | mean|TD| 1.5674
+Episode 58/100 | step 250/250 | reward  -140.346 | epsilon 0.197 | mean|TD| 1.7324
+Episode   58/100 | reward  -140.346 | epsilon 0.197 | mean|TD| 1.7324
+Episode 59/100 started
+Episode 59/100 | step 50/250 | reward    -9.216 | epsilon 0.196 | mean|TD| 1.9839
+Episode 59/100 | step 100/250 | reward   -23.466 | epsilon 0.196 | mean|TD| 2.0986
+Episode 59/100 | step 150/250 | reward   -31.752 | epsilon 0.196 | mean|TD| 1.8727
+Episode 59/100 | step 200/250 | reward   -56.962 | epsilon 0.196 | mean|TD| 1.7041
+Episode 59/100 | step 250/250 | reward   -91.868 | epsilon 0.196 | mean|TD| 1.7132
+Episode   59/100 | reward   -91.868 | epsilon 0.196 | mean|TD| 1.7132
+Episode 60/100 started
+Episode 60/100 | step 50/250 | reward   -12.294 | epsilon 0.195 | mean|TD| 2.7526
+Episode 60/100 | step 100/250 | reward   -37.432 | epsilon 0.195 | mean|TD| 2.4108
+Episode 60/100 | step 150/250 | reward   -73.116 | epsilon 0.195 | mean|TD| 2.0535
+Episode 60/100 | step 200/250 | reward  -113.864 | epsilon 0.195 | mean|TD| 1.7120
+Episode 60/100 | step 250/250 | reward  -157.074 | epsilon 0.195 | mean|TD| 1.6751
+Episode   60/100 | reward  -157.074 | epsilon 0.195 | mean|TD| 1.6751
+Episode 61/100 started
+Episode 61/100 | step 50/250 | reward   -23.676 | epsilon 0.194 | mean|TD| 4.7411
+Episode 61/100 | step 100/250 | reward   -28.668 | epsilon 0.194 | mean|TD| 2.9826
+Episode 61/100 | step 150/250 | reward   -48.094 | epsilon 0.194 | mean|TD| 2.3402
+Episode 61/100 | step 200/250 | reward   -79.492 | epsilon 0.194 | mean|TD| 1.9682
+Episode 61/100 | step 250/250 | reward  -115.400 | epsilon 0.194 | mean|TD| 1.8998
+Episode   61/100 | reward  -115.400 | epsilon 0.194 | mean|TD| 1.8998
+Episode 62/100 started
+Episode 62/100 | step 50/250 | reward   -14.512 | epsilon 0.193 | mean|TD| 2.2127
+Episode 62/100 | step 100/250 | reward   -20.856 | epsilon 0.193 | mean|TD| 1.8694
+Episode 62/100 | step 150/250 | reward   -37.314 | epsilon 0.193 | mean|TD| 1.5270
+Episode 62/100 | step 200/250 | reward   -57.386 | epsilon 0.193 | mean|TD| 1.3201
+Episode 62/100 | step 250/250 | reward   -83.914 | epsilon 0.193 | mean|TD| 1.4143
+Episode   62/100 | reward   -83.914 | epsilon 0.193 | mean|TD| 1.4143
+Episode 63/100 started
+Episode 63/100 | step 50/250 | reward    -3.536 | epsilon 0.192 | mean|TD| 3.7087
+Episode 63/100 | step 100/250 | reward    -9.752 | epsilon 0.192 | mean|TD| 2.6983
+Episode 63/100 | step 150/250 | reward   -31.048 | epsilon 0.192 | mean|TD| 2.1242
+Episode 63/100 | step 200/250 | reward   -61.160 | epsilon 0.192 | mean|TD| 1.8158
+Episode 63/100 | step 250/250 | reward   -94.686 | epsilon 0.192 | mean|TD| 1.8553
+Episode   63/100 | reward   -94.686 | epsilon 0.192 | mean|TD| 1.8553
+Episode 64/100 started
+Episode 64/100 | step 50/250 | reward    -7.428 | epsilon 0.191 | mean|TD| 1.4367
+Episode 64/100 | step 100/250 | reward   -16.100 | epsilon 0.191 | mean|TD| 1.4204
+Episode 64/100 | step 150/250 | reward   -33.228 | epsilon 0.191 | mean|TD| 1.4384
+Episode 64/100 | step 200/250 | reward   -69.256 | epsilon 0.191 | mean|TD| 1.5298
+Episode 64/100 | step 250/250 | reward  -106.790 | epsilon 0.191 | mean|TD| 2.0487
+Episode   64/100 | reward  -106.790 | epsilon 0.191 | mean|TD| 2.0487
+Episode 65/100 started
+Episode 65/100 | step 50/250 | reward   -12.758 | epsilon 0.190 | mean|TD| 1.7435
+Episode 65/100 | step 100/250 | reward    -3.298 | epsilon 0.190 | mean|TD| 1.3735
+Episode 65/100 | step 150/250 | reward    -4.506 | epsilon 0.190 | mean|TD| 1.4698
+Episode 65/100 | step 200/250 | reward   -25.894 | epsilon 0.190 | mean|TD| 2.2720
+Episode 65/100 | step 250/250 | reward   -59.828 | epsilon 0.190 | mean|TD| 3.0678
+Episode   65/100 | reward   -59.828 | epsilon 0.190 | mean|TD| 3.0678
+Episode 66/100 started
+Episode 66/100 | step 50/250 | reward   -19.400 | epsilon 0.189 | mean|TD| 2.7941
+Episode 66/100 | step 100/250 | reward   -49.170 | epsilon 0.189 | mean|TD| 2.6985
+Episode 66/100 | step 150/250 | reward   -90.052 | epsilon 0.189 | mean|TD| 2.7179
+Episode 66/100 | step 200/250 | reward  -134.382 | epsilon 0.189 | mean|TD| 2.6703
+Episode 66/100 | step 250/250 | reward  -183.408 | epsilon 0.189 | mean|TD| 2.6255
+Episode   66/100 | reward  -183.408 | epsilon 0.189 | mean|TD| 2.6255
+Episode 67/100 started
+Episode 67/100 | step 50/250 | reward   -31.584 | epsilon 0.188 | mean|TD| 1.7114
+Episode 67/100 | step 100/250 | reward   -31.442 | epsilon 0.188 | mean|TD| 1.3295
+Episode 67/100 | step 150/250 | reward   -54.642 | epsilon 0.188 | mean|TD| 1.2842
+Episode 67/100 | step 200/250 | reward   -79.702 | epsilon 0.188 | mean|TD| 1.2863
+Episode 67/100 | step 250/250 | reward  -109.326 | epsilon 0.188 | mean|TD| 1.6163
+Episode   67/100 | reward  -109.326 | epsilon 0.188 | mean|TD| 1.6163
+Episode 68/100 started
+Episode 68/100 | step 50/250 | reward    -5.834 | epsilon 0.187 | mean|TD| 2.3926
+Episode 68/100 | step 100/250 | reward   -18.268 | epsilon 0.187 | mean|TD| 1.8225
+Episode 68/100 | step 150/250 | reward   -32.768 | epsilon 0.187 | mean|TD| 1.5340
+Episode 68/100 | step 200/250 | reward   -39.104 | epsilon 0.187 | mean|TD| 1.3852
+Episode 68/100 | step 250/250 | reward   -56.596 | epsilon 0.187 | mean|TD| 1.4382
+Episode   68/100 | reward   -56.596 | epsilon 0.187 | mean|TD| 1.4382
+Episode 69/100 started
+Episode 69/100 | step 50/250 | reward    -7.446 | epsilon 0.187 | mean|TD| 1.2243
+Episode 69/100 | step 100/250 | reward   -18.472 | epsilon 0.187 | mean|TD| 0.9350
+Episode 69/100 | step 150/250 | reward   -31.758 | epsilon 0.187 | mean|TD| 0.9141
+Episode 69/100 | step 200/250 | reward   -62.954 | epsilon 0.187 | mean|TD| 0.9686
+Episode 69/100 | step 250/250 | reward   -97.910 | epsilon 0.187 | mean|TD| 1.0185
+Episode   69/100 | reward   -97.910 | epsilon 0.187 | mean|TD| 1.0185
+Episode 70/100 started
+Episode 70/100 | step 50/250 | reward    -6.146 | epsilon 0.186 | mean|TD| 2.3581
+Episode 70/100 | step 100/250 | reward   -31.234 | epsilon 0.186 | mean|TD| 1.7005
+Episode 70/100 | step 150/250 | reward   -60.964 | epsilon 0.186 | mean|TD| 1.4818
+Episode 70/100 | step 200/250 | reward  -103.314 | epsilon 0.186 | mean|TD| 1.4932
+Episode 70/100 | step 250/250 | reward  -144.810 | epsilon 0.186 | mean|TD| 1.5012
+Episode   70/100 | reward  -144.810 | epsilon 0.186 | mean|TD| 1.5012
+Episode 71/100 started
+Episode 71/100 | step 50/250 | reward   -26.596 | epsilon 0.185 | mean|TD| 2.1650
+Episode 71/100 | step 100/250 | reward   -24.646 | epsilon 0.185 | mean|TD| 1.5769
+Episode 71/100 | step 150/250 | reward   -33.200 | epsilon 0.185 | mean|TD| 1.2605
+Episode 71/100 | step 200/250 | reward   -36.302 | epsilon 0.185 | mean|TD| 1.1512
+Episode 71/100 | step 250/250 | reward   -63.424 | epsilon 0.185 | mean|TD| 1.2255
+Episode   71/100 | reward   -63.424 | epsilon 0.185 | mean|TD| 1.2255
+Episode 72/100 started
+Episode 72/100 | step 50/250 | reward   -20.536 | epsilon 0.184 | mean|TD| 1.4938
+Episode 72/100 | step 100/250 | reward   -30.006 | epsilon 0.184 | mean|TD| 1.1670
+Episode 72/100 | step 150/250 | reward   -37.728 | epsilon 0.184 | mean|TD| 1.0402
+Episode 72/100 | step 200/250 | reward   -48.534 | epsilon 0.184 | mean|TD| 1.0330
+Episode 72/100 | step 250/250 | reward   -64.726 | epsilon 0.184 | mean|TD| 1.2368
+Episode   72/100 | reward   -64.726 | epsilon 0.184 | mean|TD| 1.2368
+Episode 73/100 started
+Episode 73/100 | step 50/250 | reward   -10.844 | epsilon 0.183 | mean|TD| 1.1004
+Episode 73/100 | step 100/250 | reward   -25.914 | epsilon 0.183 | mean|TD| 0.9232
+Episode 73/100 | step 150/250 | reward   -37.096 | epsilon 0.183 | mean|TD| 0.9763
+Episode 73/100 | step 200/250 | reward   -59.570 | epsilon 0.183 | mean|TD| 1.3357
+Episode 73/100 | step 250/250 | reward   -86.284 | epsilon 0.183 | mean|TD| 1.4661
+Episode   73/100 | reward   -86.284 | epsilon 0.183 | mean|TD| 1.4661
+Episode 74/100 started
+Episode 74/100 | step 50/250 | reward   -19.664 | epsilon 0.182 | mean|TD| 1.5404
+Episode 74/100 | step 100/250 | reward   -44.266 | epsilon 0.182 | mean|TD| 1.3586
+Episode 74/100 | step 150/250 | reward   -71.908 | epsilon 0.182 | mean|TD| 1.1972
+Episode 74/100 | step 200/250 | reward  -108.058 | epsilon 0.182 | mean|TD| 1.2902
+Episode 74/100 | step 250/250 | reward  -147.326 | epsilon 0.182 | mean|TD| 1.3362
+Episode   74/100 | reward  -147.326 | epsilon 0.182 | mean|TD| 1.3362
+Episode 75/100 started
+Episode 75/100 | step 50/250 | reward    -5.976 | epsilon 0.181 | mean|TD| 1.0851
+Episode 75/100 | step 100/250 | reward   -26.028 | epsilon 0.181 | mean|TD| 0.9434
+Episode 75/100 | step 150/250 | reward   -48.562 | epsilon 0.181 | mean|TD| 0.9033
+Episode 75/100 | step 200/250 | reward   -69.302 | epsilon 0.181 | mean|TD| 1.0756
+Episode 75/100 | step 250/250 | reward  -103.302 | epsilon 0.181 | mean|TD| 1.1812
+Episode   75/100 | reward  -103.302 | epsilon 0.181 | mean|TD| 1.1812
+  Eval over 3 episodes: -135.567
+Episode 76/100 started
+Episode 76/100 | step 50/250 | reward   -11.126 | epsilon 0.180 | mean|TD| 1.1223
+Episode 76/100 | step 100/250 | reward    -3.806 | epsilon 0.180 | mean|TD| 0.9278
+Episode 76/100 | step 150/250 | reward    -2.678 | epsilon 0.180 | mean|TD| 0.8960
+Episode 76/100 | step 200/250 | reward   -11.044 | epsilon 0.180 | mean|TD| 0.9625
+Episode 76/100 | step 250/250 | reward   -24.108 | epsilon 0.180 | mean|TD| 1.0479
+Episode   76/100 | reward   -24.108 | epsilon 0.180 | mean|TD| 1.0479
+Episode 77/100 started
+Episode 77/100 | step 50/250 | reward    -7.210 | epsilon 0.179 | mean|TD| 1.2667
+Episode 77/100 | step 100/250 | reward     2.030 | epsilon 0.179 | mean|TD| 1.0616
+Episode 77/100 | step 150/250 | reward     0.868 | epsilon 0.179 | mean|TD| 1.0664
+Episode 77/100 | step 200/250 | reward    -1.950 | epsilon 0.179 | mean|TD| 1.3150
+Episode 77/100 | step 250/250 | reward   -17.396 | epsilon 0.179 | mean|TD| 1.5646
+Episode   77/100 | reward   -17.396 | epsilon 0.179 | mean|TD| 1.5646
+Episode 78/100 started
+Episode 78/100 | step 50/250 | reward    -9.026 | epsilon 0.178 | mean|TD| 1.5379
+Episode 78/100 | step 100/250 | reward   -13.500 | epsilon 0.178 | mean|TD| 1.3124
+Episode 78/100 | step 150/250 | reward   -17.632 | epsilon 0.178 | mean|TD| 1.2115
+Episode 78/100 | step 200/250 | reward   -38.750 | epsilon 0.178 | mean|TD| 1.2068
+Episode 78/100 | step 250/250 | reward   -62.430 | epsilon 0.178 | mean|TD| 1.2870
+Episode   78/100 | reward   -62.430 | epsilon 0.178 | mean|TD| 1.2870
+Episode 79/100 started
+Episode 79/100 | step 50/250 | reward    -7.286 | epsilon 0.177 | mean|TD| 1.2723
+Episode 79/100 | step 100/250 | reward    -4.794 | epsilon 0.177 | mean|TD| 1.0623
+Episode 79/100 | step 150/250 | reward    -8.066 | epsilon 0.177 | mean|TD| 1.0216
+Episode 79/100 | step 200/250 | reward    -9.750 | epsilon 0.177 | mean|TD| 0.9891
+Episode 79/100 | step 250/250 | reward   -17.534 | epsilon 0.177 | mean|TD| 1.0900
+Episode   79/100 | reward   -17.534 | epsilon 0.177 | mean|TD| 1.0900
+Episode 80/100 started
+Episode 80/100 | step 50/250 | reward   -33.292 | epsilon 0.176 | mean|TD| 1.0841
+Episode 80/100 | step 100/250 | reward   -64.876 | epsilon 0.176 | mean|TD| 0.9672
+Episode 80/100 | step 150/250 | reward  -101.612 | epsilon 0.176 | mean|TD| 0.9929
+Episode 80/100 | step 200/250 | reward  -147.352 | epsilon 0.176 | mean|TD| 0.9293
+Episode 80/100 | step 250/250 | reward  -192.222 | epsilon 0.176 | mean|TD| 0.9600
+Episode   80/100 | reward  -192.222 | epsilon 0.176 | mean|TD| 0.9600
+Episode 81/100 started
+Episode 81/100 | step 50/250 | reward    -3.416 | epsilon 0.175 | mean|TD| 1.6254
+Episode 81/100 | step 100/250 | reward   -10.036 | epsilon 0.175 | mean|TD| 1.4093
+Episode 81/100 | step 150/250 | reward   -27.772 | epsilon 0.175 | mean|TD| 1.1458
+Episode 81/100 | step 200/250 | reward   -45.412 | epsilon 0.175 | mean|TD| 1.0036
+Episode 81/100 | step 250/250 | reward   -65.922 | epsilon 0.175 | mean|TD| 0.9991
+Episode   81/100 | reward   -65.922 | epsilon 0.175 | mean|TD| 0.9991
+Episode 82/100 started
+Episode 82/100 | step 50/250 | reward   -28.600 | epsilon 0.175 | mean|TD| 1.1462
+Episode 82/100 | step 100/250 | reward   -54.064 | epsilon 0.175 | mean|TD| 1.0227
+Episode 82/100 | step 150/250 | reward   -85.020 | epsilon 0.175 | mean|TD| 0.9905
+Episode 82/100 | step 200/250 | reward  -129.068 | epsilon 0.175 | mean|TD| 0.9291
+Episode 82/100 | step 250/250 | reward  -173.042 | epsilon 0.175 | mean|TD| 0.9648
+Episode   82/100 | reward  -173.042 | epsilon 0.175 | mean|TD| 0.9648
+Episode 83/100 started
+Episode 83/100 | step 50/250 | reward   -14.416 | epsilon 0.174 | mean|TD| 1.1243
+Episode 83/100 | step 100/250 | reward   -13.710 | epsilon 0.174 | mean|TD| 1.0595
+Episode 83/100 | step 150/250 | reward   -13.976 | epsilon 0.174 | mean|TD| 0.9708
+Episode 83/100 | step 200/250 | reward   -29.644 | epsilon 0.174 | mean|TD| 0.9435
+Episode 83/100 | step 250/250 | reward   -44.300 | epsilon 0.174 | mean|TD| 0.9810
+Episode   83/100 | reward   -44.300 | epsilon 0.174 | mean|TD| 0.9810
+Episode 84/100 started
+Episode 84/100 | step 50/250 | reward   -23.064 | epsilon 0.173 | mean|TD| 1.4224
+Episode 84/100 | step 100/250 | reward   -46.236 | epsilon 0.173 | mean|TD| 1.3035
+Episode 84/100 | step 150/250 | reward   -70.862 | epsilon 0.173 | mean|TD| 1.2230
+Episode 84/100 | step 200/250 | reward  -101.198 | epsilon 0.173 | mean|TD| 1.1781
+Episode 84/100 | step 250/250 | reward  -145.142 | epsilon 0.173 | mean|TD| 1.1848
+Episode   84/100 | reward  -145.142 | epsilon 0.173 | mean|TD| 1.1848
+Episode 85/100 started
+Episode 85/100 | step 50/250 | reward   -20.544 | epsilon 0.172 | mean|TD| 2.1372
+Episode 85/100 | step 100/250 | reward   -31.938 | epsilon 0.172 | mean|TD| 1.6272
+Episode 85/100 | step 150/250 | reward   -49.508 | epsilon 0.172 | mean|TD| 1.3631
+Episode 85/100 | step 200/250 | reward   -70.076 | epsilon 0.172 | mean|TD| 1.2337
+Episode 85/100 | step 250/250 | reward   -93.056 | epsilon 0.172 | mean|TD| 1.2413
+Episode   85/100 | reward   -93.056 | epsilon 0.172 | mean|TD| 1.2413
+Episode 86/100 started
+Episode 86/100 | step 50/250 | reward   -33.008 | epsilon 0.171 | mean|TD| 2.0700
+Episode 86/100 | step 100/250 | reward   -53.536 | epsilon 0.171 | mean|TD| 1.5809
+Episode 86/100 | step 150/250 | reward   -75.362 | epsilon 0.171 | mean|TD| 1.3346
+Episode 86/100 | step 200/250 | reward  -104.938 | epsilon 0.171 | mean|TD| 1.1568
+Episode 86/100 | step 250/250 | reward  -142.202 | epsilon 0.171 | mean|TD| 1.0815
+Episode   86/100 | reward  -142.202 | epsilon 0.171 | mean|TD| 1.0815
+Episode 87/100 started
+Episode 87/100 | step 50/250 | reward   -15.012 | epsilon 0.170 | mean|TD| 2.0303
+Episode 87/100 | step 100/250 | reward   -39.302 | epsilon 0.170 | mean|TD| 1.6633
+Episode 87/100 | step 150/250 | reward   -59.118 | epsilon 0.170 | mean|TD| 1.3641
+Episode 87/100 | step 200/250 | reward   -97.472 | epsilon 0.170 | mean|TD| 1.1983
+Episode 87/100 | step 250/250 | reward  -136.024 | epsilon 0.170 | mean|TD| 1.1353
+Episode   87/100 | reward  -136.024 | epsilon 0.170 | mean|TD| 1.1353
+Episode 88/100 started
+Episode 88/100 | step 50/250 | reward   -15.338 | epsilon 0.169 | mean|TD| 1.5716
+Episode 88/100 | step 100/250 | reward   -15.678 | epsilon 0.169 | mean|TD| 1.2386
+Episode 88/100 | step 150/250 | reward   -24.738 | epsilon 0.169 | mean|TD| 1.0776
+Episode 88/100 | step 200/250 | reward   -39.998 | epsilon 0.169 | mean|TD| 0.9552
+Episode 88/100 | step 250/250 | reward   -62.996 | epsilon 0.169 | mean|TD| 0.9855
+Episode   88/100 | reward   -62.996 | epsilon 0.169 | mean|TD| 0.9855
+Episode 89/100 started
+Episode 89/100 | step 50/250 | reward   -27.918 | epsilon 0.168 | mean|TD| 1.1819
+Episode 89/100 | step 100/250 | reward   -48.402 | epsilon 0.168 | mean|TD| 1.0125
+Episode 89/100 | step 150/250 | reward   -64.302 | epsilon 0.168 | mean|TD| 1.0532
+Episode 89/100 | step 200/250 | reward   -93.578 | epsilon 0.168 | mean|TD| 0.9809
+Episode 89/100 | step 250/250 | reward  -133.116 | epsilon 0.168 | mean|TD| 0.9983
+Episode   89/100 | reward  -133.116 | epsilon 0.168 | mean|TD| 0.9983
+Episode 90/100 started
+Episode 90/100 | step 50/250 | reward   -14.852 | epsilon 0.167 | mean|TD| 1.7726
+Episode 90/100 | step 100/250 | reward   -40.660 | epsilon 0.167 | mean|TD| 1.2925
+Episode 90/100 | step 150/250 | reward   -65.764 | epsilon 0.167 | mean|TD| 1.1278
+Episode 90/100 | step 200/250 | reward  -101.198 | epsilon 0.167 | mean|TD| 1.0478
+Episode 90/100 | step 250/250 | reward  -141.922 | epsilon 0.167 | mean|TD| 1.0149
+Episode   90/100 | reward  -141.922 | epsilon 0.167 | mean|TD| 1.0149
+Episode 91/100 started
+Episode 91/100 | step 50/250 | reward   -18.204 | epsilon 0.166 | mean|TD| 1.0320
+Episode 91/100 | step 100/250 | reward   -35.640 | epsilon 0.166 | mean|TD| 1.0630
+Episode 91/100 | step 150/250 | reward   -70.252 | epsilon 0.166 | mean|TD| 0.9651
+Episode 91/100 | step 200/250 | reward  -109.156 | epsilon 0.166 | mean|TD| 0.8857
+Episode 91/100 | step 250/250 | reward  -152.216 | epsilon 0.166 | mean|TD| 0.9068
+Episode   91/100 | reward  -152.216 | epsilon 0.166 | mean|TD| 0.9068
+Episode 92/100 started
+Episode 92/100 | step 50/250 | reward    -9.706 | epsilon 0.165 | mean|TD| 2.2252
+Episode 92/100 | step 100/250 | reward   -14.216 | epsilon 0.165 | mean|TD| 1.5502
+Episode 92/100 | step 150/250 | reward   -29.056 | epsilon 0.165 | mean|TD| 1.3529
+Episode 92/100 | step 200/250 | reward   -58.412 | epsilon 0.165 | mean|TD| 1.2535
+Episode 92/100 | step 250/250 | reward   -99.332 | epsilon 0.165 | mean|TD| 1.2525
+Episode   92/100 | reward   -99.332 | epsilon 0.165 | mean|TD| 1.2525
+Episode 93/100 started
+Episode 93/100 | step 50/250 | reward   -18.354 | epsilon 0.164 | mean|TD| 1.2434
+Episode 93/100 | step 100/250 | reward   -29.942 | epsilon 0.164 | mean|TD| 1.1473
+Episode 93/100 | step 150/250 | reward   -52.100 | epsilon 0.164 | mean|TD| 1.0368
+Episode 93/100 | step 200/250 | reward   -71.898 | epsilon 0.164 | mean|TD| 0.9642
+Episode 93/100 | step 250/250 | reward  -103.510 | epsilon 0.164 | mean|TD| 1.0355
+Episode   93/100 | reward  -103.510 | epsilon 0.164 | mean|TD| 1.0355
+Episode 94/100 started
+Episode 94/100 | step 50/250 | reward   -15.708 | epsilon 0.164 | mean|TD| 2.2972
+Episode 94/100 | step 100/250 | reward   -49.012 | epsilon 0.164 | mean|TD| 1.6525
+Episode 94/100 | step 150/250 | reward   -87.310 | epsilon 0.164 | mean|TD| 1.4483
+Episode 94/100 | step 200/250 | reward  -134.024 | epsilon 0.164 | mean|TD| 1.2979
+Episode 94/100 | step 250/250 | reward  -180.828 | epsilon 0.164 | mean|TD| 1.2990
+Episode   94/100 | reward  -180.828 | epsilon 0.164 | mean|TD| 1.2990
+Episode 95/100 started
+Episode 95/100 | step 50/250 | reward   -19.146 | epsilon 0.163 | mean|TD| 1.8380
+Episode 95/100 | step 100/250 | reward   -59.340 | epsilon 0.163 | mean|TD| 1.5298
+Episode 95/100 | step 150/250 | reward   -99.610 | epsilon 0.163 | mean|TD| 1.2980
+Episode 95/100 | step 200/250 | reward  -149.562 | epsilon 0.163 | mean|TD| 1.0568
+Episode 95/100 | step 250/250 | reward  -199.558 | epsilon 0.163 | mean|TD| 1.1444
+Episode   95/100 | reward  -199.558 | epsilon 0.163 | mean|TD| 1.1444
+Episode 96/100 started
+Episode 96/100 | step 50/250 | reward   -24.876 | epsilon 0.162 | mean|TD| 1.4266
+Episode 96/100 | step 100/250 | reward   -48.516 | epsilon 0.162 | mean|TD| 1.1708
+Episode 96/100 | step 150/250 | reward   -58.280 | epsilon 0.162 | mean|TD| 1.0917
+Episode 96/100 | step 200/250 | reward   -86.754 | epsilon 0.162 | mean|TD| 1.0241
+Episode 96/100 | step 250/250 | reward  -124.198 | epsilon 0.162 | mean|TD| 1.0669
+Episode   96/100 | reward  -124.198 | epsilon 0.162 | mean|TD| 1.0669
+Episode 97/100 started
+Episode 97/100 | step 50/250 | reward    -9.640 | epsilon 0.161 | mean|TD| 2.9070
+Episode 97/100 | step 100/250 | reward   -23.624 | epsilon 0.161 | mean|TD| 1.8263
+Episode 97/100 | step 150/250 | reward   -31.990 | epsilon 0.161 | mean|TD| 1.4890
+Episode 97/100 | step 200/250 | reward   -42.658 | epsilon 0.161 | mean|TD| 1.4266
+Episode 97/100 | step 250/250 | reward   -56.840 | epsilon 0.161 | mean|TD| 1.6336
+Episode   97/100 | reward   -56.840 | epsilon 0.161 | mean|TD| 1.6336
+Episode 98/100 started
+Episode 98/100 | step 50/250 | reward   -16.430 | epsilon 0.160 | mean|TD| 1.4694
+Episode 98/100 | step 100/250 | reward   -60.412 | epsilon 0.160 | mean|TD| 1.2263
+Episode 98/100 | step 150/250 | reward   -97.190 | epsilon 0.160 | mean|TD| 1.3344
+Episode 98/100 | step 200/250 | reward  -145.946 | epsilon 0.160 | mean|TD| 1.3265
+Episode 98/100 | step 250/250 | reward  -194.822 | epsilon 0.160 | mean|TD| 1.4218
+Episode   98/100 | reward  -194.822 | epsilon 0.160 | mean|TD| 1.4218
+Episode 99/100 started
+Episode 99/100 | step 50/250 | reward   -33.604 | epsilon 0.159 | mean|TD| 1.1848
+Episode 99/100 | step 100/250 | reward   -67.170 | epsilon 0.159 | mean|TD| 1.0381
+Episode 99/100 | step 150/250 | reward  -107.776 | epsilon 0.159 | mean|TD| 1.0028
+Episode 99/100 | step 200/250 | reward  -157.848 | epsilon 0.159 | mean|TD| 0.9850
+Episode 99/100 | step 250/250 | reward  -207.754 | epsilon 0.159 | mean|TD| 1.0045
+Episode   99/100 | reward  -207.754 | epsilon 0.159 | mean|TD| 1.0045
+Episode 100/100 started
+Episode 100/100 | step 50/250 | reward    -4.768 | epsilon 0.158 | mean|TD| 1.4594
+Episode 100/100 | step 100/250 | reward   -13.918 | epsilon 0.158 | mean|TD| 1.2186
+Episode 100/100 | step 150/250 | reward   -38.518 | epsilon 0.158 | mean|TD| 1.1933
+Episode 100/100 | step 200/250 | reward   -59.986 | epsilon 0.158 | mean|TD| 1.3467
+Episode 100/100 | step 250/250 | reward   -87.400 | epsilon 0.158 | mean|TD| 1.4882
+Episode  100/100 | reward   -87.400 | epsilon 0.158 | mean|TD| 1.4882
+  Eval over 3 episodes: -164.399
+Training complete.
+Best eval reward: -126.597 at episode 50
+Weights file: C:\Users\samue\OneDrive\Documents\GitHub\AI-City-Planner\models\linear_double_q_weights.npz
+Metadata file: C:\Users\samue\OneDrive\Documents\GitHub\AI-City-Planner\models\linear_double_q_weights.json
