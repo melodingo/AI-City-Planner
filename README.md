@@ -104,6 +104,47 @@ flowchart LR
   - Real-time traffic simulation and controls.
   - In-app editor tools, minimap, metric panels, and map import/export.
 
+### City generation theory
+
+The browser generator is best understood as a constrained stochastic field on a 2D lattice. Each cell at integer coordinates $(x,y)$ is assigned a semantic state, but the layout is not random noise: it is built from layered spatial rules that bias the city toward a dense core, a structured road hierarchy, and a softer suburban edge.
+
+The city boundary is modeled as a warped ellipse. With center $(c_x,c_y)$ and radii $(r_x,r_y)$, the normalized position is
+
+$$
+u = \frac{x-c_x}{r_x},\quad v = \frac{y-c_y}{r_y},\quad d = \sqrt{u^2+v^2}.
+$$
+
+The boundary mask is then given by
+
+$$
+M(x,y)=\mathbf{1}\{u^2+v^2 \le (1+w(\theta))^2\},\quad \theta=\operatorname{atan2}(v,u),
+$$
+
+where $w(\theta)$ is a low-amplitude angular perturbation. This keeps the city compact but avoids a perfectly circular or elliptical silhouette.
+
+Zoning is radial at the top level and angularly warped at the finer level. In practice, the generator applies thresholds on $d$ to produce a CBD core, a commercial ring, and a residential belt, then introduces secondary commercial clusters and industrial edge bias. Conceptually, the rule is:
+
+$$
+z(x,y)=
+\begin{cases}
+\operatorname{CBD}, & d < d_1 + \delta(\theta) \\
+\operatorname{Commercial}, & d_1 \le d < d_2 \\
+\operatorname{Residential}, & d \ge d_2
+\end{cases}
+$$
+
+with small perturbations $\delta(\theta)$ so district borders are not concentric rings.
+
+The road network is hierarchical rather than uniform. Highways are long edge-to-edge corridors that enforce global connectivity; arterials form a more regular collector grid with spacing constraints; local streets emerge as constrained growth from arterials. In graph terms, the generator first creates a sparse backbone $G_H$, then overlays a denser intermediate graph $G_A$, and finally fills the remaining reachable space with local branches $G_L$, subject to cleanup rules that remove dead ends and isolated segments.
+
+This structure matters mathematically because it balances three competing objectives:
+
+1. Connectivity, so the drivable subgraph stays largely reachable.
+2. Separation, so parallel highways and arterials do not collapse into clumps.
+3. Variety, so the city does not reduce to a perfect grid or a pure random field.
+
+In short, the generator behaves like a multi-scale spatial process: a warped domain, a radial zoning prior, and a connectivity-preserving road growth model.
+
 ## Python Runtime Flow
 
 ```mermaid
