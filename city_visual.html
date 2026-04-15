@@ -156,6 +156,27 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 }
 #ai-episodes:focus{border-color:var(--accent)}
 #ai-episodes:disabled{opacity:.55}
+#ai-mode,
+#ai-parallel-runs,
+#ai-parallel-max{
+  border:1px solid var(--border);
+  background:rgba(13,15,20,.85);
+  color:#dbe4f5;
+  font-family:'DM Mono',monospace;
+  font-size:9px;
+  padding:2px 5px;
+  outline:none;
+}
+#ai-mode:focus,
+#ai-parallel-runs:focus,
+#ai-parallel-max:focus{border-color:var(--accent)}
+#ai-mode:disabled,
+#ai-parallel-runs:disabled,
+#ai-parallel-max:disabled{opacity:.55}
+#ai-mode{min-width:120px}
+#ai-parallel-row{display:flex;align-items:center;gap:6px;margin-top:6px}
+#ai-parallel-row label{font-size:8px;letter-spacing:.08em;color:var(--dim);text-transform:uppercase}
+#ai-parallel-runs,#ai-parallel-max{width:58px}
 
 #stop-panel{top:118px;right:13px;width:340px;min-width:340px;max-width:340px;pointer-events:auto}
 #stop-panel.hidden{display:none}
@@ -320,6 +341,19 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <div id="ai-config-row">
       <label for="ai-episodes">Episodes</label>
       <input id="ai-episodes" type="number" min="1" step="50" value="1000" />
+    </div>
+    <div id="ai-config-row">
+      <label for="ai-mode">Mode</label>
+      <select id="ai-mode">
+        <option value="single">Single</option>
+        <option value="parallel">Parallel</option>
+      </select>
+    </div>
+    <div id="ai-parallel-row">
+      <label for="ai-parallel-runs">Runs</label>
+      <input id="ai-parallel-runs" type="number" min="1" step="1" value="8" />
+      <label for="ai-parallel-max">Max</label>
+      <input id="ai-parallel-max" type="number" min="1" step="1" value="8" />
     </div>
   </div>
   <div class="panel" id="edit-panel">
@@ -3509,6 +3543,9 @@ function aiSetButtons(){
   aiEl('btn-ai-stop').disabled=!aiBridge.training;
   aiEl('btn-ai-apply').disabled=aiBridge.training||!aiBridge.modelReady;
   aiEl('ai-episodes').disabled=aiBridge.training;
+  aiEl('ai-mode').disabled=aiBridge.training;
+  aiEl('ai-parallel-runs').disabled=aiBridge.training;
+  aiEl('ai-parallel-max').disabled=aiBridge.training;
 }
 
 function aiReadEpisodes(){
@@ -3521,17 +3558,66 @@ function aiReadEpisodes(){
   return episodes;
 }
 
+function aiReadMode(){
+  const el=aiEl('ai-mode');
+  const mode=(el?.value==='parallel')?'parallel':'single';
+  try{localStorage.setItem('cityflow_ai_mode',mode);}catch(err){}
+  return mode;
+}
+
+function aiReadParallelSettings(){
+  const runsEl=aiEl('ai-parallel-runs');
+  const maxEl=aiEl('ai-parallel-max');
+
+  let runs=Number(runsEl?.value);
+  if(!Number.isFinite(runs))runs=8;
+  runs=Math.round(clamp(runs,1,64));
+
+  let maxParallel=Number(maxEl?.value);
+  if(!Number.isFinite(maxParallel))maxParallel=runs;
+  maxParallel=Math.round(clamp(maxParallel,1,64));
+  maxParallel=Math.min(maxParallel,runs);
+
+  if(runsEl)runsEl.value=String(runs);
+  if(maxEl)maxEl.value=String(maxParallel);
+
+  try{localStorage.setItem('cityflow_ai_parallel_runs',String(runs));}catch(err){}
+  try{localStorage.setItem('cityflow_ai_parallel_max',String(maxParallel));}catch(err){}
+
+  return {runs,maxParallel};
+}
+
 function aiInitConfig(){
   const el=aiEl('ai-episodes');
-  if(!el)return;
+  const modeEl=aiEl('ai-mode');
+  const runsEl=aiEl('ai-parallel-runs');
+  const maxEl=aiEl('ai-parallel-max');
+  if(!el||!modeEl||!runsEl||!maxEl)return;
   let saved=1000;
+  let mode='single';
+  let runs=8;
+  let maxParallel=8;
   try{
     const raw=localStorage.getItem('cityflow_ai_episodes');
     if(raw!==null)saved=Number(raw);
+    const rawMode=localStorage.getItem('cityflow_ai_mode');
+    if(rawMode==='parallel'||rawMode==='single')mode=rawMode;
+    const rawRuns=localStorage.getItem('cityflow_ai_parallel_runs');
+    if(rawRuns!==null)runs=Number(rawRuns);
+    const rawMax=localStorage.getItem('cityflow_ai_parallel_max');
+    if(rawMax!==null)maxParallel=Number(rawMax);
   }catch(err){}
   if(!Number.isFinite(saved))saved=1000;
+  if(!Number.isFinite(runs))runs=8;
+  if(!Number.isFinite(maxParallel))maxParallel=runs;
   saved=Math.round(clamp(saved,1,50000));
+  runs=Math.round(clamp(runs,1,64));
+  maxParallel=Math.round(clamp(maxParallel,1,64));
+  maxParallel=Math.min(maxParallel,runs);
   el.value=String(saved);
+  modeEl.value=mode;
+  runsEl.value=String(runs);
+  maxEl.value=String(maxParallel);
 }
 
 function aiFmtDuration(sec){
@@ -3700,14 +3786,21 @@ async function aiPollStatus(){
 async function aiStartTraining(){
   try{
     const episodes=aiReadEpisodes();
-    aiSetStatus('Starting external training...',`Sending run command (${episodes} episodes) to Python bridge.`,5);
+    const mode=aiReadMode();
+    const {runs,maxParallel}=aiReadParallelSettings();
+    const modeMeta=mode==='parallel'?`parallel (${runs} runs, max ${maxParallel})`:'single';
+    aiSetStatus('Starting external training...',`Sending ${modeMeta} run command (${episodes} episodes) to Python bridge.`,5);
     await aiBridgeRequest('/train',{
       method:'POST',
       body:{
+        mode,
         episodes,
         episode_length:250,
         eval_every:25,
         eval_episodes:3,
+        runs,
+        max_parallel:maxParallel,
+        numpy_threads:1,
         save_path:'models/linear_double_q_weights.npz',
       },
     });

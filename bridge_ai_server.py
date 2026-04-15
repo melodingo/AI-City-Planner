@@ -44,6 +44,20 @@ DEFAULT_MODEL_PATH = ROOT / "models" / "linear_double_q_weights.npz"
 DEFAULT_LOG_PATH = ROOT / "models" / "bridge_train.log"
 
 
+def _terminate_process_tree(proc: subprocess.Popen) -> None:
+    """Terminate training process and any child workers."""
+    if sys.platform.startswith("win"):
+        subprocess.run(
+            ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return
+
+    proc.terminate()
+
+
 @dataclass
 class BridgeState:
     process: Optional[subprocess.Popen] = None
@@ -352,11 +366,23 @@ class BridgeHandler(BaseHTTPRequestHandler):
     def _handle_train(self) -> None:
         body = self._read_json()
 
+        train_mode = str(body.get("mode", "single")).strip().lower()
+        if train_mode not in {"single", "parallel"}:
+            _json_response(
+                self,
+                HTTPStatus.BAD_REQUEST,
+                {"ok": False, "error": "Invalid mode. Use 'single' or 'parallel'."},
+            )
+            return
+
         episodes = int(body.get("episodes", 1000))
         episode_length = int(body.get("episode_length", 250))
         eval_every = int(body.get("eval_every", 25))
         eval_episodes = int(body.get("eval_episodes", 3))
         seed = int(body.get("seed", 42))
+        runs = int(body.get("runs", 8))
+        max_parallel = int(body.get("max_parallel", runs))
+        numpy_threads = int(body.get("numpy_threads", 1))
         save_path_raw = str(body.get("save_path", str(DEFAULT_MODEL_PATH)))
 
         save_path = Path(save_path_raw)
@@ -388,25 +414,50 @@ class BridgeHandler(BaseHTTPRequestHandler):
             STATE.log_path.parent.mkdir(parents=True, exist_ok=True)
             STATE.log_path.write_text("", encoding="utf-8")
 
-            cmd = [
-                sys.executable,
-                "-u",
-                "main.py",
-                "--mode",
-                "rltrain",
-                "--episodes",
-                str(episodes),
-                "--episode-length",
-                str(episode_length),
-                "--eval-every",
-                str(eval_every),
-                "--eval-episodes",
-                str(eval_episodes),
-                "--seed",
-                str(seed),
-                "--save-path",
-                str(save_path),
-            ]
+            if train_mode == "parallel":
+                cmd = [
+                    sys.executable,
+                    "-u",
+                    "parallel_rl_train.py",
+                    "--runs",
+                    str(max(1, runs)),
+                    "--max-parallel",
+                    str(max(1, max_parallel)),
+                    "--base-seed",
+                    str(seed),
+                    "--episodes",
+                    str(episodes),
+                    "--episode-length",
+                    str(episode_length),
+                    "--eval-every",
+                    str(eval_every),
+                    "--eval-episodes",
+                    str(eval_episodes),
+                    "--best-out",
+                    str(save_path),
+                    "--numpy-threads",
+                    str(max(1, numpy_threads)),
+                ]
+            else:
+                cmd = [
+                    sys.executable,
+                    "-u",
+                    "main.py",
+                    "--mode",
+                    "rltrain",
+                    "--episodes",
+                    str(episodes),
+                    "--episode-length",
+                    str(episode_length),
+                    "--eval-every",
+                    str(eval_every),
+                    "--eval-episodes",
+                    str(eval_episodes),
+                    "--seed",
+                    str(seed),
+                    "--save-path",
+                    str(save_path),
+                ]
 
             log_file = STATE.log_path.open("a", encoding="utf-8")
             proc = subprocess.Popen(
@@ -436,7 +487,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 return
 
             proc = STATE.process
-            proc.terminate()
+            _terminate_process_tree(proc)
 
         _json_response(self, HTTPStatus.OK, {"ok": True, "message": "Stop signal sent"})
 
