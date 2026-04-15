@@ -361,7 +361,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <div class="sr-row"><span>Deadlock recoveries</span><span id="sr-m-deadlock">0</span></div>
     <div class="sr-row sr-row-hotspots"><span>Hotspots</span><span id="sr-m-hotspots">none</span></div>
   </div>
-  <div id="version-tag">V6.5</div>
+  <div id="version-tag">V7</div>
   <div class="panel" id="zoom-tip" style="bottom:13px;left:50%;transform:translateX(-50%)">Scroll · zoom &nbsp;|&nbsp; Drag · pan &nbsp;|&nbsp; New City · regenerate</div>
 </div>
 
@@ -515,7 +515,7 @@ function clone2d(arr){
 function exportMapState(){
   return {
     format: 'CityFlowMap',
-    version: 'V6.5',
+    version: 'V7',
     width: GW,
     height: GH,
     grid: clone2d(grid),
@@ -3448,40 +3448,19 @@ document.getElementById('map-file-input').addEventListener('change',async e=>{
     document.getElementById('gen-phase').textContent='Import failed';
     document.getElementById('gen-meta').textContent=err.message || 'Invalid map file';
     setTimeout(()=>{document.getElementById('gen-overlay').style.display='none';},1800);
-    return;
+  }finally{
+    e.target.value='';
   }
-  e.target.value='';
 });
 
-// Lightweight browser-side AI trainer (hill climbing over scripted edits).
-const ai={
+const aiBridge={
+  baseUrl:'http://127.0.0.1:8765',
+  statusTimer:null,
   training:false,
-  stopRequested:false,
-  epochs:0,
-  totalEpochs:12,
-  candidatesPerEpoch:4,
-  minEditsPerCandidate:3,
-  maxEditsPerCandidate:8,
-  baselinePasses:3,
-  warmupTicks:180,
-  evalTicks:360,
-  bestScore:Infinity,
-  currentScore:Infinity,
-  policyReady:false,
-  baselineMetrics:null,
-  bestMetrics:null,
-  bestState:null,
-  sourceState:null,
-  prevPaused:false,
+  modelReady:false,
 };
 
 function aiEl(id){return document.getElementById(id);}
-
-function aiSetButtons(){
-  aiEl('btn-ai-train').disabled=ai.training;
-  aiEl('btn-ai-stop').disabled=!ai.training;
-  aiEl('btn-ai-apply').disabled=ai.training||!ai.policyReady;
-}
 
 function aiSetStatus(state,meta,pct){
   aiEl('ai-state').textContent=state;
@@ -3489,283 +3468,121 @@ function aiSetStatus(state,meta,pct){
   aiEl('ai-bar-fill').style.width=clamp(pct,0,100)+'%';
 }
 
-function aiGainPct(oldScore,newScore){
-  if(!Number.isFinite(oldScore)||oldScore===0||!Number.isFinite(newScore))return 0;
-  return((oldScore-newScore)/oldScore)*100;
+function aiSetButtons(){
+  aiEl('btn-ai-train').disabled=aiBridge.training;
+  aiEl('btn-ai-stop').disabled=!aiBridge.training;
+  aiEl('btn-ai-apply').disabled=aiBridge.training||!aiBridge.modelReady;
 }
 
-function aiFormatMetrics(m){
-  if(!m)return'n/a';
-  return `score ${m.score.toFixed(2)} | trip ${m.avgTrip.toFixed(2)} | stop ${m.meanStopped.toFixed(2)} | cong ${m.meanCongestion.toFixed(2)}`;
-}
-
-function aiAverageMetrics(list){
-  if(!list||!list.length)return null;
-  const sum={
-    score:0,
-    avgTrip:0,
-    meanStopped:0,
-    meanCongestion:0,
-    meanThroughput:0,
-    meanWait:0,
-  };
-  for(const m of list){
-    sum.score+=m.score;
-    sum.avgTrip+=m.avgTrip;
-    sum.meanStopped+=m.meanStopped;
-    sum.meanCongestion+=m.meanCongestion;
-    sum.meanThroughput+=m.meanThroughput;
-    sum.meanWait+=m.meanWait;
+async function aiBridgeRequest(path,opts={}){
+  const res=await fetch(aiBridge.baseUrl+path,{
+    method:opts.method||'GET',
+    headers:{'Content-Type':'application/json',...(opts.headers||{})},
+    body:opts.body?JSON.stringify(opts.body):undefined,
+  });
+  let data={};
+  try{data=await res.json();}catch(err){data={ok:false,error:'Bridge returned invalid JSON'};}
+  if(!res.ok||data.ok===false){
+    throw new Error(data.error||`Bridge error ${res.status}`);
   }
-  const n=list.length;
-  return{
-    score:sum.score/n,
-    avgTrip:sum.avgTrip/n,
-    meanStopped:sum.meanStopped/n,
-    meanCongestion:sum.meanCongestion/n,
-    meanThroughput:sum.meanThroughput/n,
-    meanWait:sum.meanWait/n,
-  };
+  return data;
 }
 
-function aiPickSeedTile(){
-  if(Math.random()<.65&&trafficMetrics?.spatial?.hotspots?.length){
-    const h=trafficMetrics.spatial.hotspots[Math.random()*trafficMetrics.spatial.hotspots.length|0];
-    return{
-      x:clampI(h.x+irnd(-6,6),0,GW-1),
-      y:clampI(h.y+irnd(-6,6),0,GH-1),
-    };
-  }
-  if(!drvTilesCache||!drvTilesCache.length)buildDrvCache();
-  if(drvTilesCache&&drvTilesCache.length){
-    const t=drvTilesCache[Math.random()*drvTilesCache.length|0];
-    return{x:t.x,y:t.y};
-  }
-  return{x:irnd(0,GW-1),y:irnd(0,GH-1)};
-}
-
-function aiPickEditTool(){
-  const r=Math.random();
-  if(r<.50)return'road-arterial';
-  if(r<.75)return'road-highway';
-  if(r<.93)return'road-local';
-  return'erase';
-}
-
-function aiCreateCandidateEdits(){
-  const edits=[];
-  const n=irnd(ai.minEditsPerCandidate,ai.maxEditsPerCandidate);
-  for(let i=0;i<n;i++){
-    const seed=aiPickSeedTile();
-    edits.push({
-      x:seed.x,
-      y:seed.y,
-      tool:aiPickEditTool(),
-      brush:Math.random()<.72?1:2,
-    });
-  }
-  return edits;
-}
-
-async function aiEvaluateCurrentLayout(){
-  const warm=Math.max(0,ai.warmupTicks|0);
-  const evalTicks=Math.max(1,ai.evalTicks|0);
-  const total=warm+evalTicks;
-  let tripSum=0,stopSum=0,congSum=0,throughputSum=0,waitSum=0;
-  let samples=0;
-
-  for(let i=0;i<total;i++){
-    if(ai.stopRequested)return null;
-    simStep();
-    if(i>=warm){
-      const cohort=[...cars,...completed.slice(-300)];
-      const avgTrip=cohort.length?cohort.reduce((s,c)=>s+c.travel,0)/cohort.length:0;
-      const m=trafficMetrics||{};
-      const meanCong=(m.congestion?.averageCarsPerTile)||0;
-      const throughput=(m.flow?.throughputPerTick)||0;
-      const wait=(m.intersection?.averageWaitTicks)||0;
-      tripSum+=avgTrip;
-      stopSum+=stoppedN;
-      congSum+=meanCong;
-      throughputSum+=throughput;
-      waitSum+=wait;
-      samples++;
+async function aiPollStatus(){
+  try{
+    const s=await aiBridgeRequest('/status');
+    aiBridge.training=!!s.running;
+    aiBridge.modelReady=!!s.model_exists;
+    if(aiBridge.training){
+      const pct=40+Math.min(55,((Date.now()/1000-s.started_at)%60)/60*55);
+      aiSetStatus('Training in Python...','Bridge online | running external rl_trainer.py',pct);
+    }else if(s.last_exit_code===0&&aiBridge.modelReady){
+      aiSetStatus('Model ready in Python.','Use Apply AI Layout to request Python-generated layout.',100);
+    }else if(s.last_exit_code!==null&&s.last_exit_code!==0){
+      aiSetStatus('Last training run failed.',`Exit code ${s.last_exit_code}. Check models/bridge_train.log`,0);
+    }else{
+      aiSetStatus('Idle (Python bridge connected).','Press Train AI to start external RL training.',0);
     }
-    if((i%10)===0)await af();
-  }
-
-  const denom=Math.max(1,samples);
-  const avgTrip=tripSum/denom;
-  const meanStopped=stopSum/denom;
-  const meanCongestion=congSum/denom;
-  const meanThroughput=throughputSum/denom;
-  const meanWait=waitSum/denom;
-  const score=(
-    1.0*avgTrip+
-    1.8*meanStopped+
-    36.0*meanCongestion+
-    3.0*meanWait-
-    10.0*meanThroughput
-  );
-
-  return{
-    score,
-    avgTrip,
-    meanStopped,
-    meanCongestion,
-    meanThroughput,
-    meanWait,
-  };
-}
-
-function aiFinishTraining(completed){
-  ai.training=false;
-  ai.stopRequested=false;
-  paused=ai.prevPaused;
-  ai.policyReady=!!ai.bestState;
-  if(completed){
-    const gain=aiGainPct(ai.baselineMetrics?.score,ai.bestMetrics?.score);
+    aiSetButtons();
+  }catch(err){
+    aiBridge.training=false;
+    aiBridge.modelReady=false;
+    aiSetButtons();
     aiSetStatus(
-      'Training complete. Policy is ready to apply.',
-      `Epoch ${ai.epochs}/${ai.totalEpochs} | gain ${gain.toFixed(1)}% | ${aiFormatMetrics(ai.bestMetrics)}`,
-      100
-    );
-  }else{
-    aiSetStatus(
-      'Training stopped. Best policy kept from completed epochs.',
-      `Epoch ${ai.epochs}/${ai.totalEpochs} | ${aiFormatMetrics(ai.bestMetrics||ai.baselineMetrics)}`,
-      (ai.epochs/ai.totalEpochs)*100
+      'Bridge offline.',
+      'Start bridge: python bridge_ai_server.py --host 127.0.0.1 --port 8765',
+      0
     );
   }
-  aiSetButtons();
 }
 
 async function aiStartTraining(){
-  if(ai.training)return;
-  ai.training=true;
-  ai.stopRequested=false;
-  ai.policyReady=false;
-  ai.epochs=0;
-  ai.bestScore=Infinity;
-  ai.currentScore=Infinity;
-  ai.baselineMetrics=null;
-  ai.bestMetrics=null;
-  ai.bestState=null;
-  ai.sourceState=exportMapState();
-  ai.prevPaused=paused;
-  paused=true;
-  aiSetButtons();
-  const baselineRuns=[];
-  const passes=Math.max(1,ai.baselinePasses|0);
-  for(let i=0;i<passes;i++){
-    aiSetStatus(
-      'Evaluating baseline...',
-      `Collecting pre-edit metrics ${i+1}/${passes} (long run).`,
-      ((i+1)/passes)*8
-    );
-    restoreMapState(ai.sourceState);
-    const run=await aiEvaluateCurrentLayout();
-    if(!run||ai.stopRequested){
-      restoreMapState(ai.sourceState);
-      aiFinishTraining(false);
-      return;
-    }
-    baselineRuns.push(run);
+  try{
+    aiSetStatus('Starting external training...','Sending run command to Python bridge.',5);
+    await aiBridgeRequest('/train',{
+      method:'POST',
+      body:{
+        episodes:1000,
+        episode_length:250,
+        eval_every:25,
+        eval_episodes:3,
+        save_path:'models/linear_double_q_weights.npz',
+      },
+    });
+    aiBridge.training=true;
+    aiSetButtons();
+    aiSetStatus('Training in Python...','Training started in background. See models/bridge_train.log',20);
+  }catch(err){
+    aiSetStatus('Could not start training.',err.message||'Bridge request failed',0);
   }
-  const baseline=aiAverageMetrics(baselineRuns);
-  if(!baseline){
-    restoreMapState(ai.sourceState);
-    aiFinishTraining(false);
-    return;
+}
+
+async function aiStopTraining(){
+  try{
+    await aiBridgeRequest('/stop',{method:'POST'});
+    aiBridge.training=false;
+    aiSetButtons();
+    aiSetStatus('Stop sent to Python trainer.','Process termination requested.',0);
+  }catch(err){
+    aiSetStatus('Could not stop training.',err.message||'Bridge request failed',0);
   }
-
-  let workingState=exportMapState();
-  let workingMetrics=baseline;
-  ai.baselineMetrics=baseline;
-  ai.bestMetrics=baseline;
-  ai.bestState=workingState;
-  ai.bestScore=baseline.score;
-  ai.currentScore=baseline.score;
-
-  for(let epoch=1;epoch<=ai.totalEpochs;epoch++){
-    if(ai.stopRequested)break;
-    ai.epochs=epoch;
-    let epochBest=null;
-
-    for(let c=0;c<ai.candidatesPerEpoch;c++){
-      if(ai.stopRequested)break;
-      restoreMapState(workingState);
-      const edits=aiCreateCandidateEdits();
-      window.cityEditor.applyEdits(edits);
-      const candMetrics=await aiEvaluateCurrentLayout();
-      if(!candMetrics||ai.stopRequested)break;
-      const candState=exportMapState();
-      if(!epochBest||candMetrics.score<epochBest.metrics.score){
-        epochBest={
-          edits,
-          metrics:candMetrics,
-          state:candState,
-        };
-      }
-      const epochPct=((epoch-1)+(c+1)/ai.candidatesPerEpoch)/ai.totalEpochs*100;
-      const gain=aiGainPct(ai.baselineMetrics.score,Math.min(ai.bestScore,candMetrics.score));
-      aiSetStatus(
-        'Training AI planner...',
-        `Epoch ${epoch}/${ai.totalEpochs} | candidate ${c+1}/${ai.candidatesPerEpoch} | gain ${gain.toFixed(1)}%`,
-        epochPct
-      );
-    }
-
-    if(ai.stopRequested)break;
-    if(epochBest&&epochBest.metrics.score<workingMetrics.score){
-      workingState=epochBest.state;
-      workingMetrics=epochBest.metrics;
-      ai.bestScore=workingMetrics.score;
-      ai.currentScore=workingMetrics.score;
-      ai.bestMetrics=workingMetrics;
-      ai.bestState=workingState;
-    }
-
-    const pct=(epoch/ai.totalEpochs)*100;
-    const gain=aiGainPct(ai.baselineMetrics.score,ai.bestMetrics.score);
-    aiSetStatus(
-      'Training AI planner...',
-      `Epoch ${epoch}/${ai.totalEpochs} | best ${ai.bestMetrics.score.toFixed(2)} | gain ${gain.toFixed(1)}%`,
-      pct
-    );
-    await af();
-  }
-
-  restoreMapState(ai.sourceState);
-  aiFinishTraining(!ai.stopRequested);
 }
 
 async function aiApplyLayout(){
-  if(ai.training)return;
-  if(!ai.policyReady||!ai.bestState){
-    aiSetStatus('No trained policy yet.','Press "Train AI" first.',0);
+  if(aiBridge.training){
+    aiSetStatus('Training still running.','Stop training or wait for completion before apply.',0);
     return;
   }
-  const gain=aiGainPct(ai.baselineMetrics?.score,ai.bestMetrics?.score);
-  aiSetStatus('Applying trained layout...','Restoring best policy state.',100);
-  aiEl('btn-ai-apply').disabled=true;
-  const wasPaused=paused;
-  paused=true;
-  restoreMapState(ai.bestState);
-  for(let i=0;i<220;i++)spawnCar();
-  paused=wasPaused;
-  aiSetStatus(
-    'AI layout applied.',
-    `Estimated gain ${gain.toFixed(1)}% | baseline ${ai.baselineMetrics?.score.toFixed(2)} -> best ${ai.bestMetrics?.score.toFixed(2)}`,
-    100
-  );
-  aiEl('btn-ai-apply').disabled=false;
+  try{
+    aiSetStatus('Requesting Python layout...','Applying trained policy to current map state.',65);
+    const wasPaused=paused;
+    paused=true;
+    const result=await aiBridgeRequest('/apply',{
+      method:'POST',
+      body:{
+        state:exportMapState(),
+        steps:160,
+        candidate_actions:1800,
+      },
+    });
+    restoreMapState(result.state);
+    paused=wasPaused;
+    aiSetStatus(
+      'Python AI layout applied.',
+      `Policy rollout steps ${result.stats.steps} | total reward ${result.stats.total_reward.toFixed(2)}`,
+      100
+    );
+  }catch(err){
+    aiSetStatus('Apply failed.',err.message||'Bridge request failed',0);
+  }
 }
 
 aiEl('btn-ai-train').onclick=()=>{aiStartTraining();};
-aiEl('btn-ai-stop').onclick=()=>{ai.stopRequested=true;};
+aiEl('btn-ai-stop').onclick=()=>{aiStopTraining();};
 aiEl('btn-ai-apply').onclick=()=>{aiApplyLayout();};
-aiSetButtons();
+if(aiBridge.statusTimer)clearInterval(aiBridge.statusTimer);
+aiBridge.statusTimer=setInterval(()=>{aiPollStatus();},2000);
+aiPollStatus();
 setStopPanelVisible(false);
 
 // ─── MAIN LOOP ────────────────────────────────────────────────────────────────

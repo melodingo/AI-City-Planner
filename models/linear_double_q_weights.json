@@ -1,0 +1,24 @@
+{
+  "algorithm": "linear_double_q",
+  "config": {
+    "episodes": 1,
+    "episode_length": 5,
+    "width": 20,
+    "height": 20,
+    "max_cars": 30,
+    "spawn_rate": 0.3,
+    "gamma": 0.98,
+    "alpha": 0.02,
+    "epsilon_start": 0.25,
+    "epsilon_end": 0.02,
+    "epsilon_decay_episodes": 250,
+    "seed": 42,
+    "eval_every": 1,
+    "eval_episodes": 1,
+    "save_path": "C:\\Users\\samue\\OneDrive\\Documents\\GitHub\\AI-City-Planner\\models\\linear_double_q_weights.npz"
+  },
+  "result": {
+    "best_eval_reward": -1.507999999821186,
+    "best_episode": 1.0
+  }
+}

@@ -310,6 +310,38 @@ def run_optimize(
         run_visual_from_grid(clone_grid(best_grid), ticks=min(ticks, 400), title="After Optimization")
 
 
+def run_rl_training(
+    episodes: int,
+    episode_length: int,
+    alpha: float,
+    gamma: float,
+    epsilon_start: float,
+    epsilon_end: float,
+    epsilon_decay_episodes: int,
+    eval_every: int,
+    eval_episodes: int,
+    seed: int,
+    save_path: str,
+) -> None:
+    """Run long headless RL training in external Python module."""
+    from rl_trainer import TrainConfig, train
+
+    cfg = TrainConfig(
+        episodes=episodes,
+        episode_length=episode_length,
+        alpha=alpha,
+        gamma=gamma,
+        epsilon_start=epsilon_start,
+        epsilon_end=epsilon_end,
+        epsilon_decay_episodes=epsilon_decay_episodes,
+        eval_every=eval_every,
+        eval_episodes=eval_episodes,
+        seed=seed,
+        save_path=save_path,
+    )
+    train(cfg)
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -318,9 +350,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="AI City Planner")
     parser.add_argument(
         "--mode",
-        choices=["visual", "headless", "envtest", "optimize"],
+        choices=["visual", "headless", "envtest", "optimize", "rltrain"],
         default="optimize",
-        help="visual: pygame baseline | headless: text metrics | envtest: RL wrapper smoke test | optimize: AI improvement loop",
+        help="visual: pygame baseline | headless: text metrics | envtest: RL wrapper smoke test | optimize: AI improvement loop | rltrain: long headless reinforcement learning",
     )
     parser.add_argument("--ticks", type=int, default=300, help="Ticks per evaluation/simulation run")
     parser.add_argument("--iterations", type=int, default=20, help="Optimization iterations")
@@ -332,6 +364,16 @@ def main() -> None:
         action="store_true",
         help="In optimize mode, show pygame before/after visualization",
     )
+    parser.add_argument("--episodes", type=int, default=300, help="Training episodes for --mode rltrain")
+    parser.add_argument("--episode-length", type=int, default=200, help="Episode length for --mode rltrain")
+    parser.add_argument("--alpha", type=float, default=0.02, help="Learning rate for --mode rltrain")
+    parser.add_argument("--gamma", type=float, default=0.98, help="Discount factor for --mode rltrain")
+    parser.add_argument("--epsilon-start", type=float, default=0.25, help="Initial epsilon for --mode rltrain")
+    parser.add_argument("--epsilon-end", type=float, default=0.02, help="Final epsilon for --mode rltrain")
+    parser.add_argument("--epsilon-decay-episodes", type=int, default=250, help="Epsilon decay schedule length for --mode rltrain")
+    parser.add_argument("--eval-every", type=int, default=25, help="Evaluate every N episodes in --mode rltrain")
+    parser.add_argument("--eval-episodes", type=int, default=3, help="Evaluation episodes in --mode rltrain")
+    parser.add_argument("--save-path", type=str, default="models/linear_double_q_weights.npz", help="Model output path for --mode rltrain")
     args = parser.parse_args()
 
     if args.mode == "headless":
@@ -340,6 +382,20 @@ def main() -> None:
         run_env_test(args.ticks)
     elif args.mode == "visual":
         run_visual(args.ticks)
+    elif args.mode == "rltrain":
+        run_rl_training(
+            episodes=args.episodes,
+            episode_length=args.episode_length,
+            alpha=args.alpha,
+            gamma=args.gamma,
+            epsilon_start=args.epsilon_start,
+            epsilon_end=args.epsilon_end,
+            epsilon_decay_episodes=args.epsilon_decay_episodes,
+            eval_every=args.eval_every,
+            eval_episodes=args.eval_episodes,
+            seed=args.seed,
+            save_path=args.save_path,
+        )
     else:
         run_optimize(
             ticks=args.ticks,

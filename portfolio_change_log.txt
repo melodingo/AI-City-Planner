@@ -6,6 +6,13 @@ city simulation so it can be reused later for portfolio documentation.
 
 Major Versions
 
+12. V7 - external RL bridge and browser AI decoupling (Apr 2026)
+  - Moved reinforcement learning training out of the HTML runtime into external Python modules.
+  - Added a local bridge server so browser controls call Python endpoints for train, stop, status, and apply.
+  - Replaced browser-side AI hill-climbing logic with bridge-based external training control.
+  - Added apply flow that sends current map state to Python and restores returned optimized layout.
+  - Updated browser version label and export metadata to `V7`.
+
 11. V6.5 - zoning visibility and district identity expansion (Apr 2026)
   - Added a bottom-left zoning toggle with colorful zone-boundary outlines for quick planning review.
   - Added an on-demand zone legend panel that appears with the zoning overlay.
