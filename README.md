@@ -117,7 +117,7 @@ $$
 The boundary mask is then given by
 
 $$
-M(x,y)=\mathbf{1}\{u^2+v^2 \le (1+w(\theta))^2\},\quad \theta=\operatorname{atan2}(v,u),
+M(x,y)=\mathbf{1}\{u^2+v^2 \le (1+w(\theta))^2\},\quad \theta=\text{atan2}(v,u),
 $$
 
 where $w(\theta)$ is a low-amplitude angular perturbation. This keeps the city compact but avoids a perfectly circular or elliptical silhouette.
@@ -127,9 +127,9 @@ Zoning is radial at the top level and angularly warped at the finer level. In pr
 $$
 z(x,y)=
 \begin{cases}
-\operatorname{CBD}, & d < d_1 + \delta(\theta) \\
-\operatorname{Commercial}, & d_1 \le d < d_2 \\
-\operatorname{Residential}, & d \ge d_2
+\text{CBD}, & d < d_1 + \delta(\theta) \\
+\text{Commercial}, & d_1 \le d < d_2 \\
+\text{Residential}, & d \ge d_2
 \end{cases}
 $$
 
