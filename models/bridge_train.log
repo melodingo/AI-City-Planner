@@ -1,0 +1,10 @@
+=== RL Training (Linear Double Q) ===
+episodes=2 | episode_length=250 | gamma=0.980 | alpha=0.0200
+Episode    1/2 | reward  -169.092 | epsilon 0.249 | mean|TD| 0.9413
+Episode    2/2 | reward  -181.514 | epsilon 0.248 | mean|TD| 1.0590
+  Eval over 3 episodes: -114.683
+  New best model saved to C:\Users\samue\OneDrive\Documents\GitHub\AI-City-Planner\models\linear_double_q_weights.npz
+Training complete.
+Best eval reward: -114.683 at episode 2
+Weights file: C:\Users\samue\OneDrive\Documents\GitHub\AI-City-Planner\models\linear_double_q_weights.npz
+Metadata file: C:\Users\samue\OneDrive\Documents\GitHub\AI-City-Planner\models\linear_double_q_weights.json

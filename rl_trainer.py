@@ -261,9 +261,11 @@ def train(cfg: TrainConfig) -> Dict[str, float]:
         f"episodes={cfg.episodes} | episode_length={cfg.episode_length} | "
         f"gamma={cfg.gamma:.3f} | alpha={cfg.alpha:.4f}"
     )
+    checkpoint_steps = max(1, cfg.episode_length // 5)
 
     for ep in range(1, cfg.episodes + 1):
         epsilon = epsilon_for_episode(cfg, ep)
+        print(f"Episode {ep}/{cfg.episodes} started", flush=True)
 
         obs = env.reset()
         info = dict(env._last_metrics)
@@ -291,6 +293,14 @@ def train(cfg: TrainConfig) -> Dict[str, float]:
             episode_reward += float(reward)
             obs, info = next_obs, next_info
             step += 1
+
+            if step % checkpoint_steps == 0 or done:
+                print(
+                    f"Episode {ep}/{cfg.episodes} | step {step}/{cfg.episode_length} | "
+                    f"reward {episode_reward:>9.3f} | epsilon {epsilon:.3f} | "
+                    f"mean|TD| {(td_abs_sum / max(1, step)):.4f}",
+                    flush=True,
+                )
 
         mean_abs_td = td_abs_sum / max(1, step)
         print(

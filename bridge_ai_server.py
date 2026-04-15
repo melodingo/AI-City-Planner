@@ -390,6 +390,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
             cmd = [
                 sys.executable,
+                "-u",
                 "main.py",
                 "--mode",
                 "rltrain",
