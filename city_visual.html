@@ -133,12 +133,29 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
   padding:4px 8px;
 }
 
-#ai-panel{top:13px;right:13px;min-width:230px}
+#ai-panel{top:13px;right:13px;min-width:270px;pointer-events:auto}
 #ai-title{font-size:9px;letter-spacing:.12em;color:var(--accent);margin-bottom:6px}
 #ai-state{font-size:9px;color:var(--text);margin-bottom:6px}
 #ai-bar{height:3px;background:#1e2330;overflow:hidden;margin-bottom:6px}
 #ai-bar-fill{height:100%;width:0%;background:var(--green);transition:width .2s}
 #ai-meta{font-size:8px;color:var(--dim);letter-spacing:.05em}
+#ai-progress{display:grid;grid-template-columns:1fr;gap:3px;margin-top:6px}
+.ai-mini-row{display:flex;justify-content:space-between;gap:10px;font-size:8px;line-height:1.25;letter-spacing:.04em;color:var(--text);white-space:nowrap}
+.ai-mini-row span:last-child{color:#dbe4f5;text-align:right;font-variant-numeric:tabular-nums;font-feature-settings:'tnum' 1}
+#ai-config-row{display:flex;align-items:center;gap:6px;margin-top:6px}
+#ai-config-row label{font-size:8px;letter-spacing:.08em;color:var(--dim);text-transform:uppercase}
+#ai-episodes{
+  width:86px;
+  border:1px solid var(--border);
+  background:rgba(13,15,20,.85);
+  color:#dbe4f5;
+  font-family:'DM Mono',monospace;
+  font-size:9px;
+  padding:2px 5px;
+  outline:none;
+}
+#ai-episodes:focus{border-color:var(--accent)}
+#ai-episodes:disabled{opacity:.55}
 
 #stop-panel{top:118px;right:13px;width:340px;min-width:340px;max-width:340px;pointer-events:auto}
 #stop-panel.hidden{display:none}
@@ -293,6 +310,17 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <div id="ai-state">Idle. Train to start learning traffic-aware edits.</div>
     <div id="ai-bar"><div id="ai-bar-fill"></div></div>
     <div id="ai-meta">Epoch 0/0 | best score n/a</div>
+    <div id="ai-progress">
+      <div class="ai-mini-row"><span>Episodes passed</span><span id="ai-passed">0</span></div>
+      <div class="ai-mini-row"><span>Episodes left</span><span id="ai-left">0</span></div>
+      <div class="ai-mini-row"><span>Target / length</span><span id="ai-target">0 / 0</span></div>
+      <div class="ai-mini-row"><span>Live reward</span><span id="ai-live-reward">n/a</span></div>
+      <div class="ai-mini-row"><span>Live epsilon / TD</span><span id="ai-live-eps-td">n/a</span></div>
+    </div>
+    <div id="ai-config-row">
+      <label for="ai-episodes">Episodes</label>
+      <input id="ai-episodes" type="number" min="1" step="50" value="1000" />
+    </div>
   </div>
   <div class="panel" id="edit-panel">
     <div id="edit-title">CITY EDITOR</div>
@@ -361,7 +389,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <div class="sr-row"><span>Deadlock recoveries</span><span id="sr-m-deadlock">0</span></div>
     <div class="sr-row sr-row-hotspots"><span>Hotspots</span><span id="sr-m-hotspots">none</span></div>
   </div>
-  <div id="version-tag">V6.5</div>
+  <div id="version-tag">V7</div>
   <div class="panel" id="zoom-tip" style="bottom:13px;left:50%;transform:translateX(-50%)">Scroll · zoom &nbsp;|&nbsp; Drag · pan &nbsp;|&nbsp; New City · regenerate</div>
 </div>
 
@@ -515,7 +543,7 @@ function clone2d(arr){
 function exportMapState(){
   return {
     format: 'CityFlowMap',
-    version: 'V6.5',
+    version: 'V7',
     width: GW,
     height: GH,
     grid: clone2d(grid),
@@ -3448,29 +3476,19 @@ document.getElementById('map-file-input').addEventListener('change',async e=>{
     document.getElementById('gen-phase').textContent='Import failed';
     document.getElementById('gen-meta').textContent=err.message || 'Invalid map file';
     setTimeout(()=>{document.getElementById('gen-overlay').style.display='none';},1800);
-    return;
+  }finally{
+    e.target.value='';
   }
-  e.target.value='';
 });
 
-// AI training UI scaffold (frontend only for now)
-const ai={
+const aiBridge={
+  baseUrl:'http://127.0.0.1:8765',
+  statusTimer:null,
   training:false,
-  epochs:0,
-  totalEpochs:28,
-  bestScore:Infinity,
-  currentScore:Infinity,
-  timer:null,
-  policyReady:false,
+  modelReady:false,
 };
 
 function aiEl(id){return document.getElementById(id);}
-
-function aiSetButtons(){
-  aiEl('btn-ai-train').disabled=ai.training;
-  aiEl('btn-ai-stop').disabled=!ai.training;
-  aiEl('btn-ai-apply').disabled=ai.training||!ai.policyReady;
-}
 
 function aiSetStatus(state,meta,pct){
   aiEl('ai-state').textContent=state;
@@ -3478,72 +3496,276 @@ function aiSetStatus(state,meta,pct){
   aiEl('ai-bar-fill').style.width=clamp(pct,0,100)+'%';
 }
 
-function aiFinishTraining(completed){
-  if(ai.timer){clearInterval(ai.timer);ai.timer=null;}
-  ai.training=false;
-  ai.policyReady=completed;
-  if(completed){
-    aiSetStatus(
-      'Training complete. Mock policy is ready to apply.',
-      `Epoch ${ai.epochs}/${ai.totalEpochs} | best score ${ai.bestScore.toFixed(2)}`,
-      100
-    );
-  }else{
-    aiSetStatus(
-      'Training stopped. Current mock policy was discarded.',
-      `Epoch ${ai.epochs}/${ai.totalEpochs} | no policy exported`,
-      (ai.epochs/ai.totalEpochs)*100
-    );
-  }
-  aiSetButtons();
+function aiSetProgressUI({passed=0,left=0,target=0,length=0,reward='n/a',epsilon='n/a',td='n/a'}={}){
+  aiEl('ai-passed').textContent=String(passed);
+  aiEl('ai-left').textContent=String(left);
+  aiEl('ai-target').textContent=`${target || 'n/a'} / ${length || 'n/a'}`;
+  aiEl('ai-live-reward').textContent=typeof reward==='number' ? reward.toFixed(3) : String(reward);
+  aiEl('ai-live-eps-td').textContent=`${typeof epsilon==='number' ? epsilon.toFixed(3) : epsilon} / ${typeof td==='number' ? td.toFixed(3) : td}`;
 }
 
-function aiStartTraining(){
-  if(ai.training)return;
-  ai.training=true;
-  ai.policyReady=false;
-  ai.epochs=0;
-  ai.bestScore=Infinity;
-  ai.currentScore=Infinity;
-  aiSetButtons();
-  aiSetStatus('Training AI planner (mock)...','Epoch 0/'+ai.totalEpochs+' | best score n/a',0);
+function aiSetButtons(){
+  aiEl('btn-ai-train').disabled=aiBridge.training;
+  aiEl('btn-ai-stop').disabled=!aiBridge.training;
+  aiEl('btn-ai-apply').disabled=aiBridge.training||!aiBridge.modelReady;
+  aiEl('ai-episodes').disabled=aiBridge.training;
+}
 
-  ai.timer=setInterval(()=>{
-    ai.epochs++;
-    const trend=(ai.totalEpochs-ai.epochs)/ai.totalEpochs;
-    ai.currentScore=18+trend*55+Math.random()*7;
-    if(ai.currentScore<ai.bestScore)ai.bestScore=ai.currentScore;
-    const pct=(ai.epochs/ai.totalEpochs)*100;
+function aiReadEpisodes(){
+  const el=aiEl('ai-episodes');
+  let episodes=Number(el?.value);
+  if(!Number.isFinite(episodes))episodes=1000;
+  episodes=Math.round(clamp(episodes,1,50000));
+  if(el)el.value=String(episodes);
+  try{localStorage.setItem('cityflow_ai_episodes',String(episodes));}catch(err){}
+  return episodes;
+}
+
+function aiInitConfig(){
+  const el=aiEl('ai-episodes');
+  if(!el)return;
+  let saved=1000;
+  try{
+    const raw=localStorage.getItem('cityflow_ai_episodes');
+    if(raw!==null)saved=Number(raw);
+  }catch(err){}
+  if(!Number.isFinite(saved))saved=1000;
+  saved=Math.round(clamp(saved,1,50000));
+  el.value=String(saved);
+}
+
+function aiFmtDuration(sec){
+  const s=Math.max(0,Math.floor(sec||0));
+  const h=(s/3600)|0;
+  const m=((s%3600)/60)|0;
+  const r=s%60;
+  if(h>0)return`${h}h ${m}m ${r}s`;
+  if(m>0)return`${m}m ${r}s`;
+  return`${r}s`;
+}
+
+function aiLatestLogLine(logTail=''){
+  const lines=String(logTail||'').split(/\r?\n/).map(v=>v.trim()).filter(Boolean);
+  return lines.length?lines[lines.length-1]:'';
+}
+
+function aiGetCmdArg(cmd,name,defValue='n/a'){
+  if(!Array.isArray(cmd))return defValue;
+  const i=cmd.indexOf(name);
+  if(i<0||i+1>=cmd.length)return defValue;
+  return cmd[i+1];
+}
+
+function aiParseTrainConfig(cmd=[]){
+  const episodes=Number(aiGetCmdArg(cmd,'--episodes',NaN));
+  const episodeLength=Number(aiGetCmdArg(cmd,'--episode-length',NaN));
+  const evalEvery=Number(aiGetCmdArg(cmd,'--eval-every',NaN));
+  const evalEpisodes=Number(aiGetCmdArg(cmd,'--eval-episodes',NaN));
+  return{
+    episodes:Number.isFinite(episodes)?episodes:null,
+    episodeLength:Number.isFinite(episodeLength)?episodeLength:null,
+    evalEvery:Number.isFinite(evalEvery)?evalEvery:null,
+    evalEpisodes:Number.isFinite(evalEpisodes)?evalEpisodes:null,
+  };
+}
+
+function aiParseEpisodeProgress(logTail=''){
+  const lines=String(logTail||'').split(/\r?\n/);
+  for(let i=lines.length-1;i>=0;i--){
+    const stepLine=lines[i].match(/Episode\s+(\d+)\s*\/\s*(\d+)\s+\|\s+step\s+(\d+)\s*\/\s*(\d+)\s+\|\s+reward\s+([-+]?\d+(?:\.\d+)?)\s+\|\s+epsilon\s+([-+]?\d+(?:\.\d+)?)\s+\|\s+mean\|TD\|\s+([-+]?\d+(?:\.\d+)?)/i);
+    if(stepLine){
+      return{
+        current:Number(stepLine[1]),
+        total:Number(stepLine[2]),
+        step:Number(stepLine[3]),
+        stepTotal:Number(stepLine[4]),
+        reward:Number(stepLine[5]),
+        epsilon:Number(stepLine[6]),
+        meanTd:Number(stepLine[7]),
+      };
+    }
+    const rich=lines[i].match(/Episode\s+(\d+)\s*\/\s*(\d+)\s+\|\s+reward\s+([-+]?\d+(?:\.\d+)?)\s+\|\s+epsilon\s+([-+]?\d+(?:\.\d+)?)\s+\|\s+mean\|TD\|\s+([-+]?\d+(?:\.\d+)?)/i);
+    if(rich){
+      return{
+        current:Number(rich[1]),
+        total:Number(rich[2]),
+        reward:Number(rich[3]),
+        epsilon:Number(rich[4]),
+        meanTd:Number(rich[5]),
+      };
+    }
+    const m=lines[i].match(/Episode\s+(\d+)\s*\/\s*(\d+)\s+\|\s+reward\s+([-+]?\d+(?:\.\d+)?)/i);
+    if(m){
+      return{
+        current:Number(m[1]),
+        total:Number(m[2]),
+        reward:Number(m[3]),
+      };
+    }
+  }
+  return null;
+}
+
+function aiParseLastEval(logTail=''){
+  const lines=String(logTail||'').split(/\r?\n/);
+  for(let i=lines.length-1;i>=0;i--){
+    const m=lines[i].match(/Eval\s+over\s+(\d+)\s+episodes:\s+([-+]?\d+(?:\.\d+)?)/i);
+    if(m){
+      return{
+        episodes:Number(m[1]),
+        score:Number(m[2]),
+      };
+    }
+  }
+  return null;
+}
+
+async function aiBridgeRequest(path,opts={}){
+  const res=await fetch(aiBridge.baseUrl+path,{
+    method:opts.method||'GET',
+    headers:{'Content-Type':'application/json',...(opts.headers||{})},
+    body:opts.body?JSON.stringify(opts.body):undefined,
+  });
+  let data={};
+  try{data=await res.json();}catch(err){data={ok:false,error:'Bridge returned invalid JSON'};}
+  if(!res.ok||data.ok===false){
+    throw new Error(data.error||`Bridge error ${res.status}`);
+  }
+  return data;
+}
+
+async function aiPollStatus(){
+  try{
+    const s=await aiBridgeRequest('/status');
+    aiBridge.training=!!s.running;
+    aiBridge.modelReady=!!s.model_exists;
+    const cfg=aiParseTrainConfig(s.cmd||[]);
+    const elapsed=aiFmtDuration(Date.now()/1000-(s.started_at||0));
+    const ep=aiParseEpisodeProgress(s.log_tail||'');
+    const ev=aiParseLastEval(s.log_tail||'');
+    const lastLine=aiLatestLogLine(s.log_tail||'');
+    aiSetProgressUI({
+      passed: ep?.current || 0,
+      left: ep?.total ? Math.max(0, ep.total-(ep.current||0)) : 0,
+      target: cfg.episodes || 0,
+      length: cfg.episodeLength || 0,
+      step: ep?.step || 0,
+      stepTotal: ep?.stepTotal || 0,
+      reward: Number.isFinite(ep?.reward) ? ep.reward : 'n/a',
+      epsilon: Number.isFinite(ep?.epsilon) ? ep.epsilon : 'n/a',
+      td: Number.isFinite(ep?.meanTd) ? ep.meanTd : 'n/a',
+    });
+
+    if(aiBridge.training){
+      let pct=25;
+      let state='Training in Python...';
+      let meta=`PID ${s.pid||'n/a'} | elapsed ${elapsed} | target ${cfg.episodes??'n/a'} ep`;
+      if(ep&&ep.total>0){
+        pct=clamp((ep.current/ep.total)*100,5,98);
+        const remaining=Math.max(0,ep.total-ep.current);
+        state=`Training episode ${ep.current} of ${ep.total}`;
+        const epsTxt=Number.isFinite(ep.epsilon)?` | epsilon ${ep.epsilon.toFixed(3)}`:'';
+        const tdTxt=Number.isFinite(ep.meanTd)?` | mean|TD| ${ep.meanTd.toFixed(3)}`:'';
+        const stepTxt=Number.isFinite(ep.step)&&Number.isFinite(ep.stepTotal)?` | step ${ep.step}/${ep.stepTotal}`:'';
+        meta=`PID ${s.pid||'n/a'} | elapsed ${elapsed} | passed ${ep.current} | left ${remaining}${stepTxt} | reward ${ep.reward.toFixed(3)}${epsTxt}${tdTxt}`;
+      }else if(lastLine){
+        meta=`PID ${s.pid||'n/a'} | elapsed ${elapsed} | len ${cfg.episodeLength??'n/a'} | eval/${cfg.evalEvery??'n/a'} | ${lastLine.slice(0,40)}`;
+      }
+      aiSetStatus(state,meta,pct);
+    }else if(s.last_exit_code===0&&aiBridge.modelReady){
+      const doneEp=(ep&&ep.total>0)?ep.total:(cfg.episodes??'n/a');
+      const evalTxt=ev&&Number.isFinite(ev.score)?` | eval ${ev.score.toFixed(3)} over ${ev.episodes}`:'';
+      const rewTxt=ep&&Number.isFinite(ep.reward)?` | latest reward ${ep.reward.toFixed(3)}`:'';
+      const info=`Completed ${doneEp} episodes${rewTxt}${evalTxt}`;
+      aiSetStatus('Model ready in Python.',info,100);
+    }else if(s.last_exit_code!==null&&s.last_exit_code!==0){
+      const errMsg=lastLine||`Exit code ${s.last_exit_code}. Check models/bridge_train.log`;
+      aiSetStatus('Last training run failed.',errMsg,0);
+    }else{
+      aiSetStatus('Idle (Python bridge connected).','Press Train AI to start external RL training.',0);
+    }
+    aiSetButtons();
+  }catch(err){
+    aiBridge.training=false;
+    aiBridge.modelReady=false;
+    aiSetButtons();
     aiSetStatus(
-      'Training AI planner (mock)...',
-      `Epoch ${ai.epochs}/${ai.totalEpochs} | best score ${ai.bestScore.toFixed(2)}`,
-      pct
+      'Bridge offline.',
+      'Start bridge: python bridge_ai_server.py --host 127.0.0.1 --port 8765',
+      0
     );
-    if(ai.epochs>=ai.totalEpochs)aiFinishTraining(true);
-  },250);
+  }
+}
+
+async function aiStartTraining(){
+  try{
+    const episodes=aiReadEpisodes();
+    aiSetStatus('Starting external training...',`Sending run command (${episodes} episodes) to Python bridge.`,5);
+    await aiBridgeRequest('/train',{
+      method:'POST',
+      body:{
+        episodes,
+        episode_length:250,
+        eval_every:25,
+        eval_episodes:3,
+        save_path:'models/linear_double_q_weights.npz',
+      },
+    });
+    aiBridge.training=true;
+    aiSetButtons();
+    aiSetStatus('Training in Python...','Training started in background. See models/bridge_train.log',20);
+  }catch(err){
+    aiSetStatus('Could not start training.',err.message||'Bridge request failed',0);
+  }
+}
+
+async function aiStopTraining(){
+  try{
+    await aiBridgeRequest('/stop',{method:'POST'});
+    aiBridge.training=false;
+    aiSetButtons();
+    aiSetStatus('Stop sent to Python trainer.','Process termination requested.',0);
+  }catch(err){
+    aiSetStatus('Could not stop training.',err.message||'Bridge request failed',0);
+  }
 }
 
 async function aiApplyLayout(){
-  if(ai.training)return;
-  if(!ai.policyReady){
-    aiSetStatus('No trained policy yet.','Press "Train AI" first.',0);
+  if(aiBridge.training){
+    aiSetStatus('Training still running.','Stop training or wait for completion before apply.',0);
     return;
   }
-  aiSetStatus('Applying AI layout (mock)...','Regenerating city with learned edits placeholder.',100);
-  aiEl('btn-ai-apply').disabled=true;
-  await startCity();
-  aiSetStatus(
-    'AI layout applied (mock).',
-    'City regenerated. Compare congestion and avg trip against previous run.',
-    100
-  );
-  aiEl('btn-ai-apply').disabled=false;
+  try{
+    aiSetStatus('Requesting Python layout...','Applying trained policy to current map state.',65);
+    const wasPaused=paused;
+    paused=true;
+    const result=await aiBridgeRequest('/apply',{
+      method:'POST',
+      body:{
+        state:exportMapState(),
+        steps:160,
+        candidate_actions:1800,
+      },
+    });
+    restoreMapState(result.state);
+    paused=wasPaused;
+    aiSetStatus(
+      'Python AI layout applied.',
+      `Policy rollout steps ${result.stats.steps} | total reward ${result.stats.total_reward.toFixed(2)}`,
+      100
+    );
+  }catch(err){
+    aiSetStatus('Apply failed.',err.message||'Bridge request failed',0);
+  }
 }
 
-aiEl('btn-ai-train').onclick=()=>aiStartTraining();
-aiEl('btn-ai-stop').onclick=()=>aiFinishTraining(false);
+aiEl('btn-ai-train').onclick=()=>{aiStartTraining();};
+aiEl('btn-ai-stop').onclick=()=>{aiStopTraining();};
 aiEl('btn-ai-apply').onclick=()=>{aiApplyLayout();};
-aiSetButtons();
+aiInitConfig();
+if(aiBridge.statusTimer)clearInterval(aiBridge.statusTimer);
+aiBridge.statusTimer=setInterval(()=>{aiPollStatus();},2000);
+aiPollStatus();
 setStopPanelVisible(false);
 
 // ─── MAIN LOOP ────────────────────────────────────────────────────────────────

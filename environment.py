@@ -21,11 +21,13 @@ Action space  (Discrete: 3 action types × grid cells)
 
 Reward
 ------
-  Each step:
-    -0.1  × avg_travel_time
-    -0.5  × stopped_cars
-    -0.2  × mean(congestion)
-    -1.0  build penalty (if action changed the grid)
+    Each step uses *metric deltas* so improvements are rewarded:
+        +w1 × (prev_avg_travel - avg_travel)
+        +w2 × (prev_stopped - stopped)
+        +w3 × (prev_mean_congestion - mean_congestion)
+        +w4 × newly_completed_cars
+        -build penalty (if action changed the grid)
+        -invalid-action penalty (if action does nothing)
 """
 
 import numpy as np
@@ -47,11 +49,13 @@ class TrafficEnv:
     obs, reward, done, info = env.step(action)
     """
 
-    # Reward shaping weights
-    W_TRAVEL_TIME   = 0.10
-    W_STOPPED       = 0.50
-    W_CONGESTION    = 0.20
-    W_BUILD_PENALTY = 1.00
+    # Reward shaping weights for delta-based reward.
+    W_DELTA_TRAVEL     = 1.40
+    W_DELTA_STOPPED    = 0.90
+    W_DELTA_CONGESTION = 3.20
+    W_THROUGHPUT       = 0.80
+    W_BUILD_PENALTY    = 0.05
+    W_INVALID_ACTION   = 0.02
 
     def __init__(self,
                  width: int = 20,
@@ -76,6 +80,7 @@ class TrafficEnv:
                                        spawn_rate=spawn_rate)
         self._t      = 0
         self._last_metrics: dict = {}
+        self._prev_metrics: dict = {}
 
     # ------------------------------------------------------------------
     # Core Gym interface
@@ -91,6 +96,7 @@ class TrafficEnv:
         self._t = 0
         # Run one warm-up tick so cars exist from the first observation
         self._last_metrics = self.engine.step()
+        self._prev_metrics = dict(self._last_metrics)
         return self._build_observation()
 
     def step(self, action: int):
@@ -111,6 +117,7 @@ class TrafficEnv:
         grid_changed = self._apply_action(action_type, tile_x, tile_y)
 
         # --- advance simulation ---
+        self._prev_metrics = dict(self._last_metrics)
         self._last_metrics = self.engine.step()
         self._t += 1
 
@@ -175,19 +182,36 @@ class TrafficEnv:
     # ------------------------------------------------------------------
 
     def _compute_reward(self, grid_changed: bool) -> float:
-        m = self._last_metrics
+        prev = self._prev_metrics
+        curr = self._last_metrics
 
-        avg_travel  = m.get("avg_travel_time", 0.0)
-        stopped     = m.get("stopped_cars",    0)
-        cmap        = m.get("congestion_map",  np.zeros(1))
-        mean_cong   = float(np.mean(cmap))
+        prev_travel = float(prev.get("avg_travel_time", 0.0))
+        curr_travel = float(curr.get("avg_travel_time", 0.0))
 
-        reward  = 0.0
-        reward -= self.W_TRAVEL_TIME   * avg_travel
-        reward -= self.W_STOPPED       * stopped
-        reward -= self.W_CONGESTION    * mean_cong
+        prev_stopped = float(prev.get("stopped_cars", 0.0))
+        curr_stopped = float(curr.get("stopped_cars", 0.0))
+
+        prev_cong = float(np.mean(prev.get("congestion_map", np.zeros(1))))
+        curr_cong = float(np.mean(curr.get("congestion_map", np.zeros(1))))
+
+        prev_completed = float(prev.get("completed_cars", 0.0))
+        curr_completed = float(curr.get("completed_cars", 0.0))
+
+        delta_travel = prev_travel - curr_travel
+        delta_stopped = prev_stopped - curr_stopped
+        delta_cong = prev_cong - curr_cong
+        throughput = max(0.0, curr_completed - prev_completed)
+
+        reward = 0.0
+        reward += self.W_DELTA_TRAVEL * delta_travel
+        reward += self.W_DELTA_STOPPED * delta_stopped
+        reward += self.W_DELTA_CONGESTION * delta_cong
+        reward += self.W_THROUGHPUT * throughput
+
         if grid_changed:
             reward -= self.W_BUILD_PENALTY
+        else:
+            reward -= self.W_INVALID_ACTION
 
         return float(reward)
 

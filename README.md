@@ -21,6 +21,14 @@ That gives a practical baseline for future RL or search-based planning policies.
 
 ## Latest Updates (Apr 2026)
 
+### Browser release V7
+
+- Moved AI training fully out of the browser and into external Python training/runtime files.
+- Added a local bridge service so Train AI, Stop AI, and Apply AI Layout call Python endpoints instead of in-page hill climbing.
+- Added background training support and bridge status/log reporting for longer runs.
+- Removed unused browser-side AI optimizer logic to reduce in-page overhead.
+- Updated browser release metadata and map export version to V7.
+
 ### Browser release V6.5
 
 - Added a bottom-left zoning toggle that draws colorful zone-boundary outlines.
@@ -95,6 +103,47 @@ flowchart LR
   - Procedural city generation with hierarchical roads.
   - Real-time traffic simulation and controls.
   - In-app editor tools, minimap, metric panels, and map import/export.
+
+### City generation theory
+
+The browser generator is best understood as a constrained stochastic field on a 2D lattice. Each cell at integer coordinates $(x,y)$ is assigned a semantic state, but the layout is not random noise: it is built from layered spatial rules that bias the city toward a dense core, a structured road hierarchy, and a softer suburban edge.
+
+The city boundary is modeled as a warped ellipse. With center $(c_x,c_y)$ and radii $(r_x,r_y)$, the normalized position is
+
+$$
+u = \frac{x-c_x}{r_x},\quad v = \frac{y-c_y}{r_y},\quad d = \sqrt{u^2+v^2}.
+$$
+
+The boundary mask is then given by
+
+$$
+M(x,y)=\mathbf{1}\{u^2+v^2 \le (1+w(\theta))^2\},\quad \theta=\text{atan2}(v,u),
+$$
+
+where $w(\theta)$ is a low-amplitude angular perturbation. This keeps the city compact but avoids a perfectly circular or elliptical silhouette.
+
+Zoning is radial at the top level and angularly warped at the finer level. In practice, the generator applies thresholds on $d$ to produce a CBD core, a commercial ring, and a residential belt, then introduces secondary commercial clusters and industrial edge bias. Conceptually, the rule is:
+
+$$
+z(x,y)=
+\begin{cases}
+\text{CBD}, & d < d_1 + \delta(\theta) \\
+\text{Commercial}, & d_1 \le d < d_2 \\
+\text{Residential}, & d \ge d_2
+\end{cases}
+$$
+
+with small perturbations $\delta(\theta)$ so district borders are not concentric rings.
+
+The road network is hierarchical rather than uniform. Highways are long edge-to-edge corridors that enforce global connectivity; arterials form a more regular collector grid with spacing constraints; local streets emerge as constrained growth from arterials. In graph terms, the generator first creates a sparse backbone $G_H$, then overlays a denser intermediate graph $G_A$, and finally fills the remaining reachable space with local branches $G_L$, subject to cleanup rules that remove dead ends and isolated segments.
+
+This structure matters mathematically because it balances three competing objectives:
+
+1. Connectivity, so the drivable subgraph stays largely reachable.
+2. Separation, so parallel highways and arterials do not collapse into clumps.
+3. Variety, so the city does not reduce to a perfect grid or a pure random field.
+
+In short, the generator behaves like a multi-scale spatial process: a warped domain, a radial zoning prior, and a connectivity-preserving road growth model.
 
 ## Python Runtime Flow
 
@@ -184,7 +233,55 @@ python main.py --mode optimize --visualize-results
 python main.py --mode visual
 python main.py --mode headless
 python main.py --mode envtest
+python main.py --mode rltrain --episodes 500 --episode-length 250
 ```
+
+## External RL Training (Headless)
+
+The browser file is no longer required for learning. Training now runs in Python via `rl_trainer.py` and can run for long sessions in the background.
+
+### Quick start
+
+```bash
+python main.py --mode rltrain --episodes 600 --episode-length 250 --eval-every 25
+```
+
+Model artifacts are saved to:
+
+- `models/linear_double_q_weights.npz`
+- `models/linear_double_q_weights.json`
+
+### RL math used
+
+The trainer uses **Linear Double Q-learning**:
+
+$$
+Q(s,a) = w^\top \phi(s,a)
+$$
+
+with Double-Q target:
+
+$$
+y = r + \gamma Q_{\bar{i}}(s', \arg\max_{a'} Q_i(s',a'))
+$$
+
+and update:
+
+$$
+w_i \leftarrow w_i + \alpha (y - Q_i(s,a))\phi(s,a)
+$$
+
+The environment reward in `environment.py` is delta-based:
+
+$$
+r_t =
+w_1(\overline{T}_{t-1}-\overline{T}_t) +
+w_2(S_{t-1}-S_t) +
+w_3(C_{t-1}-C_t) +
+w_4(\Delta \text{completed}) - \text{buildPenalty} - \text{invalidPenalty}
+$$
+
+where lower travel/stops/congestion gives positive reward.
 
 ## Browser Simulator Notes
 
@@ -199,6 +296,26 @@ It includes:
 - Import/export of map state.
 
 Version history is tracked in `portfolio_change_log.txt`.
+
+### Train AI button bridge (external Python)
+
+The browser no longer runs hill-climbing AI inside HTML. The **Train AI / Stop AI / Apply AI Layout** buttons now call a local Python bridge server.
+
+Start the bridge in a terminal before using those buttons:
+
+```bash
+python bridge_ai_server.py --host 127.0.0.1 --port 8765
+```
+
+How it works:
+
+- `Train AI` starts external RL training (`main.py --mode rltrain`) in the background.
+- `Stop AI` sends a terminate signal to the running trainer.
+- `Apply AI Layout` sends the current browser map state to Python, applies the trained policy, and restores the returned state in the browser.
+
+Training log path:
+
+- `models/bridge_train.log`
 
 ## Extension Points
 
