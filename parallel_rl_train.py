@@ -9,7 +9,7 @@ cannot fully utilize all cores.
 Example
 -------
 python parallel_rl_train.py --runs 8 --max-parallel 8 --episodes 500 --episode-length 250
-python parallel_rl_train.py --runs 12 --max-parallel 12 --episodes 500 --episode-length 250 --alpha 0.01 --epsilon-decay-episodes 400 --eval-episodes 10 --numpy-threads 1
+python parallel_rl_train.py --runs 12 --max-parallel 12 --episodes 500 --episode-length 250 --alpha 0.01 --epsilon-decay-episodes 400 --eval-every 10 --eval-episodes 30 --numpy-threads 1
 """
 
 from __future__ import annotations
@@ -159,8 +159,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--epsilon-start", type=float, default=0.25)
     parser.add_argument("--epsilon-end", type=float, default=0.02)
     parser.add_argument("--epsilon-decay-episodes", type=int, default=400)
-    parser.add_argument("--eval-every", type=int, default=25)
-    parser.add_argument("--eval-episodes", type=int, default=10)
+    parser.add_argument("--eval-every", type=int, default=10)
+    parser.add_argument("--eval-episodes", type=int, default=30)
 
     parser.add_argument(
         "--run-dir",

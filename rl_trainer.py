@@ -46,18 +46,30 @@ class TrainConfig:
     epsilon_end: float = 0.02
     epsilon_decay_episodes: int = 250
     seed: int = 42
-    eval_every: int = 25
-    eval_episodes: int = 3
+    eval_every: int = 10
+    eval_episodes: int = 30
+    td_clip: float = 2.0
+    l2_weight_decay: float = 1e-5
     save_path: str = "models/linear_double_q_weights.npz"
 
 
 class LinearDoubleQAgent:
     """Linear function approximator with Double Q-learning updates."""
 
-    def __init__(self, env: TrafficEnv, alpha: float, gamma: float, seed: int = 42):
+    def __init__(
+        self,
+        env: TrafficEnv,
+        alpha: float,
+        gamma: float,
+        td_clip: float = 0.0,
+        l2_weight_decay: float = 0.0,
+        seed: int = 42,
+    ):
         self.env = env
         self.alpha = float(alpha)
         self.gamma = float(gamma)
+        self.td_clip = max(0.0, float(td_clip))
+        self.l2_weight_decay = max(0.0, float(l2_weight_decay))
         self.rng = np.random.default_rng(seed)
 
         # phi(s,a) has: 1 bias + 7 state + 7 action + (7x7) cross = 64 features.
@@ -137,27 +149,53 @@ class LinearDoubleQAgent:
         feats = self.phi(obs, info, step, action)
         return float(np.dot(self.w1 + self.w2, feats))
 
-    def best_action(self, obs: np.ndarray, info: Dict[str, float], step: int, use_q1: bool = True) -> int:
-        best_a = 0
+    def valid_actions(self, obs: np.ndarray) -> np.ndarray:
+        """Return encoded actions that can change the grid under current state."""
+        # obs[0] stores normalized tile type: EMPTY=0, ROAD=1/3, HIGHWAY=2/3, INTERSECTION=1.
+        cells = np.rint(np.clip(obs[0], 0.0, 1.0) * 3.0).astype(np.int8).reshape(-1)
+
+        add_road = np.where(cells == 0)[0]
+        upgrade_highway = np.where(cells == 1)[0] + self.actions_per_type
+        add_intersection = np.where((cells == 1) | (cells == 2))[0] + 2 * self.actions_per_type
+
+        valid = np.concatenate([add_road, upgrade_highway, add_intersection])
+        if valid.size == 0:
+            return np.arange(self.env.action_space_n, dtype=np.int64)
+        return valid.astype(np.int64)
+
+    def best_action(
+        self,
+        obs: np.ndarray,
+        info: Dict[str, float],
+        step: int,
+        use_q1: bool = True,
+        actions: np.ndarray | None = None,
+    ) -> int:
+        action_set = actions if actions is not None else self.valid_actions(obs)
+        best_a = int(action_set[0])
         best_val = -float("inf")
-        for a in range(self.env.action_space_n):
-            v = self.q1(obs, info, step, a) if use_q1 else self.q2(obs, info, step, a)
+        for a in action_set:
+            aa = int(a)
+            v = self.q1(obs, info, step, aa) if use_q1 else self.q2(obs, info, step, aa)
             if v > best_val:
                 best_val = v
-                best_a = a
+                best_a = aa
         return best_a
 
     def act(self, obs: np.ndarray, info: Dict[str, float], step: int, epsilon: float) -> int:
+        actions = self.valid_actions(obs)
         if self.rng.random() < epsilon:
-            return int(self.rng.integers(0, self.env.action_space_n))
+            idx = int(self.rng.integers(0, len(actions)))
+            return int(actions[idx])
 
-        best_a = 0
+        best_a = int(actions[0])
         best_val = -float("inf")
-        for a in range(self.env.action_space_n):
-            v = self.q_sum(obs, info, step, a)
+        for a in actions:
+            aa = int(a)
+            v = self.q_sum(obs, info, step, aa)
             if v > best_val:
                 best_val = v
-                best_a = a
+                best_a = aa
         return best_a
 
     def update(
@@ -178,19 +216,23 @@ class LinearDoubleQAgent:
             if done:
                 target = reward
             else:
-                a_star = self.best_action(next_obs, next_info, step + 1, use_q1=True)
+                next_actions = self.valid_actions(next_obs)
+                a_star = self.best_action(next_obs, next_info, step + 1, use_q1=True, actions=next_actions)
                 target = reward + self.gamma * self.q2(next_obs, next_info, step + 1, a_star)
             td_error = target - current
-            self.w1 += self.alpha * td_error * feats
+            td_used = float(np.clip(td_error, -self.td_clip, self.td_clip)) if self.td_clip > 0.0 else td_error
+            self.w1 += self.alpha * (td_used * feats - self.l2_weight_decay * self.w1)
         else:
             current = float(np.dot(self.w2, feats))
             if done:
                 target = reward
             else:
-                a_star = self.best_action(next_obs, next_info, step + 1, use_q1=False)
+                next_actions = self.valid_actions(next_obs)
+                a_star = self.best_action(next_obs, next_info, step + 1, use_q1=False, actions=next_actions)
                 target = reward + self.gamma * self.q1(next_obs, next_info, step + 1, a_star)
             td_error = target - current
-            self.w2 += self.alpha * td_error * feats
+            td_used = float(np.clip(td_error, -self.td_clip, self.td_clip)) if self.td_clip > 0.0 else td_error
+            self.w2 += self.alpha * (td_used * feats - self.l2_weight_decay * self.w2)
 
         return float(td_error)
 
@@ -251,7 +293,14 @@ def train(cfg: TrainConfig) -> Dict[str, float]:
     np.random.seed(cfg.seed)
 
     env = make_env(cfg)
-    agent = LinearDoubleQAgent(env, alpha=cfg.alpha, gamma=cfg.gamma, seed=cfg.seed)
+    agent = LinearDoubleQAgent(
+        env,
+        alpha=cfg.alpha,
+        gamma=cfg.gamma,
+        td_clip=cfg.td_clip,
+        l2_weight_decay=cfg.l2_weight_decay,
+        seed=cfg.seed,
+    )
 
     best_eval_reward = -float("inf")
     best_episode = -1
@@ -354,8 +403,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--epsilon-start", type=float, default=0.25)
     parser.add_argument("--epsilon-end", type=float, default=0.02)
     parser.add_argument("--epsilon-decay-episodes", type=int, default=250)
-    parser.add_argument("--eval-every", type=int, default=25)
-    parser.add_argument("--eval-episodes", type=int, default=3)
+    parser.add_argument("--eval-every", type=int, default=10)
+    parser.add_argument("--eval-episodes", type=int, default=30)
+    parser.add_argument("--td-clip", type=float, default=2.0)
+    parser.add_argument("--l2-weight-decay", type=float, default=1e-5)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--save-path", type=str, default="models/linear_double_q_weights.npz")
     return parser
@@ -377,6 +428,8 @@ def config_from_args(args: argparse.Namespace) -> TrainConfig:
         seed=args.seed,
         eval_every=args.eval_every,
         eval_episodes=args.eval_episodes,
+        td_clip=args.td_clip,
+        l2_weight_decay=args.l2_weight_decay,
         save_path=args.save_path,
     )
 

@@ -111,7 +111,7 @@ flowchart LR
 
 - `main.py`
   - CLI entrypoint.
-  - Runs baseline, visual, optimization, and env test modes.
+  - Runs visual/headless/env test/optimization plus `rltrain` mode.
   - Contains hill-climbing optimization loop and score function.
 
 - `grid.py`
@@ -130,6 +130,18 @@ flowchart LR
 
 - `environment.py`
   - Gym-style wrapper for RL integration experiments.
+
+- `rl_trainer.py`
+  - Headless Linear Double Q-learning trainer.
+  - Saves model weights/metadata to `models/`.
+
+- `parallel_rl_train.py`
+  - Launches multiple seeded `rl_trainer.py` runs in parallel.
+  - Selects and copies the best-performing model artifact.
+
+- `bridge_ai_server.py`
+  - Local HTTP bridge used by browser Train/Stop/Apply AI controls.
+  - Starts/stops external training and applies trained policy to browser map state.
 
 ### Browser simulator
 
@@ -371,6 +383,6 @@ If you want to evolve this codebase, these are the best insertion points:
 
 The project is currently a strong prototype baseline:
 
-- Deterministic enough for repeatable scoring loops.
-- Fast enough for iterative optimization experiments.
-- Structured enough to serve as a foundation for RL-based planners.
+- Supports repeatable optimization and RL runs with saved model artifacts in `models/`.
+- Includes parallel multi-seed RL training (`parallel_rl_train.py`) for faster model search.
+- Integrates browser controls with external Python AI through `bridge_ai_server.py`.
